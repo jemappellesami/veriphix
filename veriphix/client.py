@@ -142,6 +142,29 @@ def remove_flow(pattern):
     return clean_pattern
 
 
+def MSIfy(pattern:Pattern):
+    """
+    This function modifies the pattern and adds the preparation of magic states.
+    The conditioned phase gate is to be taken care of in MeasureMethod
+    """
+    magic_nodes = []
+    clean_pattern = Pattern(pattern.input_nodes)
+    for cmd in pattern:
+        if cmd.kind == CommandKind.M and cmd.angle == 0.25: 
+                clean_pattern.add(graphix.command.M(node=cmd.node, angle=0, s_domain=cmd.s_domain, t_domain=cmd.t_domain))
+                magic_nodes.append(cmd.node)
+        else:
+            clean_pattern.add(cmd)
+
+    clean_pattern_ancillas = Pattern(pattern.input_nodes)
+    # Prepare magic ancillas instead
+    for cmd in clean_pattern:
+        if cmd.kind == CommandKind.N and cmd.node in magic_nodes:
+            clean_pattern_ancillas.add(graphix.command.N(node=cmd.node, state=BasicStates.TdPLUS))
+        else:
+            clean_pattern_ancillas.add(cmd)
+    return clean_pattern_ancillas
+
 def prepared_nodes_as_input_nodes(pattern: Pattern) -> Pattern:
     input_nodes = pattern.input_nodes
     seq = []
@@ -154,10 +177,18 @@ def prepared_nodes_as_input_nodes(pattern: Pattern) -> Pattern:
     result.extend(seq)
     return result
 
+def get_magic_nodes(pattern:Pattern):
+    magic_nodes = []
+    for cmd in pattern:
+        if cmd.kind == CommandKind.N and cmd.state == BasicStates.TdPLUS:
+            magic_nodes.append(cmd.node)
+    return magic_nodes
 
 class Client:
     def __init__(self, pattern, input_state=None, measure_method_cls=None, secrets: None | Secrets = None) -> None:
         self.initial_pattern = pattern
+
+        self.magic_nodes = get_magic_nodes(self.initial_pattern)
 
         self.input_nodes = self.initial_pattern.input_nodes.copy()
         self.output_nodes = self.initial_pattern.output_nodes.copy()
@@ -215,11 +246,12 @@ class Client:
         # First prepare inputs
         backend.add_nodes(nodes=self.input_nodes, data=self.input_state)
 
-        # Then iterate over auxiliaries required to blind
-        outer_nodes = set(self.input_nodes + self.output_nodes)
-        aux_nodes = [node for node in self.nodes_list if node not in outer_nodes]
-        aux_data = [BasicStates.PLUS for _ in aux_nodes]
-        backend.add_nodes(nodes=aux_nodes, data=aux_data)
+        # # Then iterate over auxiliaries required to blind
+        for cmd in self.initial_pattern:
+            if cmd.kind == CommandKind.N and cmd.node not in self.input_nodes:
+                node, data = cmd.node, cmd.state
+                if (node not in self.output_nodes) and (node not in self.input_nodes):
+                    backend.add_nodes(nodes=[node], data=data)
 
         # Prepare outputs
         output_data = []
@@ -302,6 +334,17 @@ class Client:
 
         return trap_outcomes
 
+    def delegate_MSI(self, backend:Backend) -> None:
+        self.prepare_states(backend)
+        self.blind_qubits(backend)
+        self.clean_pattern = MSIfy(self.clean_pattern)
+        self.measure_method = ClientMSIMeasureMethod(self)
+        sim = PatternSimulator(
+            backend=backend, pattern=self.clean_pattern, measure_method=self.measure_method
+        )
+        sim.run(input_state=None)
+        self.decode_output_state(backend)
+
     def delegate_pattern(self, backend: Backend, **kwargs) -> None:
         self.prepare_states(backend)
         self.blind_qubits(backend)
@@ -357,6 +400,39 @@ class ClientMeasureMethod(MeasureMethod):
         angle = angle * measure_update.coeff + measure_update.add_term
         angle = (-1) ** a_value * angle + theta_value * np.pi / 4 + np.pi * (r_value + a_N_value)
         # angle = angle * measure_update.coeff + measure_update.add_term
+        return Measurement(plane=measure_update.new_plane, angle=angle)
+
+    def get_measure_result(self, node: int) -> bool:
+        raise ValueError("Server cannot have access to measurement results")
+
+    def set_measure_result(self, node: int, result: bool) -> None:
+        if self.__client.secret_datas.r:
+            result ^= self.__client.secret_datas.r[node]
+        self.__client.results[node] = result
+
+class ClientMSIMeasureMethod(MeasureMethod):
+    def __init__(self, client: Client):
+        self.__client = client
+
+    def get_measurement_description(self, cmd: BaseM) -> Measurement:
+        parameters = self.__client.measurement_db[cmd.node]
+
+
+
+        s_signal = sum(self.__client.results[j] for j in parameters.s_domain)
+        t_signal = sum(self.__client.results[j] for j in parameters.t_domain)
+        measure_update = MeasureUpdate.compute(parameters.plane, s_signal % 2 == 1, t_signal % 2 == 1, Clifford.I)
+        # print("meas update", measure_update)
+
+
+        angle = parameters.angle * np.pi 
+        # IF MAGIC NODES
+        if cmd.node in self.__client.magic_nodes:
+            angle += + (s_signal%2)*np.pi/2
+
+
+        angle = angle * measure_update.coeff + measure_update.add_term
+
         return Measurement(plane=measure_update.new_plane, angle=angle)
 
     def get_measure_result(self, node: int) -> bool:

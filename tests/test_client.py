@@ -1,12 +1,12 @@
 import unittest
 
 import numpy as np
-from graphix.random_objects import rand_circuit
-from graphix.sim.statevec import StatevectorBackend
+from graphix.random_objects import rand_circuit, Circuit
+from graphix.sim.statevec import StatevectorBackend, Statevec
 from graphix.states import BasicStates
 from numpy.random import Generator
 
-from veriphix.client import Client, ClientMeasureMethod, Secrets
+from veriphix.client import Client, ClientMeasureMethod, Secrets, MSIfy
 
 
 class TestClient:
@@ -154,6 +154,28 @@ class TestClient:
         assert set(backend.node_index) == set(nodes)
         client.blind_qubits(backend)
         assert set(backend.node_index) == set(nodes)
+
+    def test_MSI(self, fx_rng: Generator):
+        circuit = Circuit(1)
+        circuit.h(0)
+        circuit.rz(0, -0.25*np.pi)
+        circuit.rz(0, -0.25*np.pi)
+        pattern = circuit.transpile().pattern
+        pattern.standardize(method="global")
+
+    
+        MSIfied_pattern = MSIfy(pattern)
+        
+        client = Client(pattern)
+        MSI_client = Client(pattern)
+
+        svb_1 = StatevectorBackend()
+        client.delegate_pattern(backend=svb_1)
+
+        svb_2 = StatevectorBackend()
+        MSI_client.delegate_MSI(backend=svb_2)
+
+        np.testing.assert_almost_equal(np.abs(np.dot(svb_1.state.psi.flatten().conjugate(), svb_2.state.psi.flatten())), 1)
 
     def test_UBQC(self, fx_rng: Generator):
         # Generate random pattern
