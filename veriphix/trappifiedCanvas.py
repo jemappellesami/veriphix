@@ -34,7 +34,7 @@ class TrappifiedCanvas:
         self.traps_list = traps_list
 
         self.trap_stabilizers = [self.compute_trap_stabilizer(trap) for trap in self.traps_list]
-        self.stabilizer = self.merge_pauli_list(self.trap_stabilizers)
+        self.stabilizer = self.merge_compatible_traps(self.trap_stabilizers)
         dummies_coins = self.generate_coins_dummies()
         self.coins = self.generate_coins_trap_qubits(coins=dummies_coins)
         self.states = self.generate_eigenstate()
@@ -69,6 +69,18 @@ class TrappifiedCanvas:
             trap_stabilizer *= self.get_canonical_stabilizer(node)
         return trap_stabilizer
 
+    # The list of traps given in argument can be merged in one single Pauli String, per assumption
+    def merge_compatible_traps(self, pauli_list:list[stim.PauliString]) -> stim.PauliString:
+        n_traps = len(pauli_list)
+        assert n_traps >= 2
+        merged_pauli_string = pauli_list[0]
+        for stabilizer in pauli_list[1:]:
+            new = self.merge(stabilizer_1=merged_pauli_string, stabilizer_2=stabilizer)
+            merged_pauli_string= new
+        return merged_pauli_string
+
+
+    # TODO: remove (obsolete). This procedure of deriving the least number of test runs has to be done on the protocol level
     def merge_pauli_list(self, pauli_list) -> stim.PauliString:
         """
         If the protocol is coherent, all the stabilizers should be able to merge in one Pauli string.
