@@ -219,6 +219,8 @@ class Client:
         aux_data = [BasicStates.PLUS for _ in aux_nodes]
         backend.add_nodes(nodes=aux_nodes, data=aux_data)
 
+
+        ## TODO: revoir ça
         # Prepare outputs
         output_data = []
         for node in self.output_nodes:
@@ -263,11 +265,11 @@ class Client:
                 trap: Trap = set(trap_qubits)
                 traps_list.append(trap)
 
+            ## TODO
             # In here, traps_list is a list of traps that are compatible already, because they are of the same color
             # So we can just merge them all already
             # And assume that TrappifiedCanvas needs to be instanciated with a traps_list that corresponds to a coloring.
             # and TC just merges them assuming they are all mergeable.
-
             trappified_canvas = TrappifiedCanvas(graph, traps_list=traps_list)
 
             runs.append(trappified_canvas)
