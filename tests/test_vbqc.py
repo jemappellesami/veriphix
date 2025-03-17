@@ -30,7 +30,7 @@ class TestVBQC:
         for stab in test_stabs:
             backend = StatevectorBackend()
             canvas = TrappifiedCanvas(stab)
-            trap_outcomes = client.delegate_test_run(backend=backend, run=canvas)
+            trap_outcomes, _ = client.delegate_test_run(backend=backend, run=canvas)
             assert trap_outcomes == [0 for _ in stab.traps_list]
 
     def test_noiseless(self, fx_rng: Generator):
@@ -57,7 +57,7 @@ class TestVBQC:
             backend = DensityMatrixBackend(rng=fx_rng)
             client.refresh_randomness()
             canvas = TrappifiedCanvas(stab, rng=fx_rng)
-            trap_outcomes = client.delegate_test_run(backend=backend, run=canvas, noise_model=noise_model)
+            trap_outcomes, _ = client.delegate_test_run(backend=backend, run=canvas, noise_model=noise_model)
             assert sum(trap_outcomes) == 0
 
     def test_noisy(self, fx_rng: Generator):
@@ -83,6 +83,6 @@ class TestVBQC:
             backend = DensityMatrixBackend(rng=fx_rng)
             client.refresh_randomness()
             canvas = TrappifiedCanvas(stab, rng=fx_rng)
-            trap_outcomes = client.delegate_test_run(backend=backend, run=canvas, noise_model=noise_model)
+            trap_outcomes, _ = client.delegate_test_run(backend=backend, run=canvas, noise_model=noise_model)
             total_trap_failures += sum(trap_outcomes)
         assert total_trap_failures > 0

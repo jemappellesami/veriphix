@@ -61,9 +61,9 @@ class Secret_a:
 
 @dataclass
 class Secrets:
-    r: bool = False
-    a: bool = False
-    theta: bool = False
+    r: bool = True
+    a: bool = True
+    theta: bool = True
 
 
 @dataclass
@@ -185,9 +185,6 @@ class Client:
 
         self.byproduct_db = get_byproduct_db(pattern_copy)
 
-        # self.secrets_bool : bool -> self.secrets is not None
-        # self.secrets_type : Secrets -> self.secrets
-        # self.secrets : SecretDatas-> self.secret_datas
         self.secrets = secrets
         if secrets is None:
             self.secrets_bool = False
@@ -195,8 +192,6 @@ class Client:
 
         self.secret_datas = SecretDatas.from_secrets(secrets, self.graph, self.input_nodes, self.output_nodes)
 
-        # pattern_without_flow = remove_flow(pattern)
-        # self.clean_pattern = prepared_nodes_as_input_nodes(pattern_without_flow)
 
         self.input_state = input_state if input_state is not None else [BasicStates.PLUS for _ in self.input_nodes]
 
@@ -387,14 +382,18 @@ class Client:
         sim.run(input_state=None)
 
         trap_outcomes = []
+        trap_outcomes_dict = {}
         for trap in run.traps_list:
             outcomes = [self.results[component] for component in trap]  # here
             trap_outcome = sum(outcomes) % 2
             trap_outcomes.append(trap_outcome)
+            # Single-qubit trap
+            trap_outcomes_dict[trap.pop()] = trap_outcome
+        # print(trap_outcomes_dict)
 
         self.measurement_db = tmp_measurement_db
 
-        return trap_outcomes
+        return trap_outcomes, trap_outcomes_dict
 
     def delegate_pattern(self, backend: Backend, **kwargs) -> None:
         # Initializes the bank & asks backend to create the input
