@@ -168,7 +168,7 @@ def remove_flow(pattern):
     return clean_pattern
 
 
-def get_graph_clifford_structure(graph: nx.Graph):
+def get_graph_clifford_structure(graph: nx.Graph) -> stim.Tableau:
     circuit = Circuit()
     for edge in graph.edges:
         i, j = edge
