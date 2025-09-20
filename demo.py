@@ -165,7 +165,7 @@ def main(
     # === Define noise models ===
     
     
-    depol_param_sweep = [1e-4, 5e-4, 1e-3, 2.7e-3, 5e-3, 1e-2, 5e-2]
+    depol_param_sweep = [1e-3, 2.7e-3, 5e-3, 1e-2, 5e-2]
     depol = {f"depolarising-{p}": DepolarisingNoiseModel(entanglement_error_prob=p) for p in depol_param_sweep}
     
     default_pattern = load_pattern_from_circuit(random.choice(sampled_circuits))
@@ -178,7 +178,7 @@ def main(
     }
     
     combined_noise_models = {
-        **malicious_global,
+        # **malicious_global,
         **depol
     }
     
