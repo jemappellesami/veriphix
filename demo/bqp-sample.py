@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 
 bqp_error = 1 / np.e
-epsilon = 0.01
+epsilon = 0.05
 
 
 n_sample = 100

@@ -172,14 +172,14 @@ def main(
     colors = veriphix.sampling_circuits.brickwork_state_transpiler.get_bipartite_coloring(default_pattern)
     output_node = default_pattern.output_nodes[0]
     
-    malicious_global_param_sweep = np.linspace(0, 1, 3)
+    malicious_global_param_sweep = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
     malicious_global = {
         f"malicious-{p}": MaliciousNoiseModel(nodes=[output_node], prob=p) for p in malicious_global_param_sweep
     }
     
     combined_noise_models = {
         **malicious_global,
-        # **depol
+        **depol
     }
     
     # === Setup protocol parameters ===
