@@ -166,11 +166,11 @@ def main(
     
     
     depol_param_sweep = [
-        1e-4,
-        5e-4,
+        # 1e-4,
+        # 5e-4,
         # 1e-3,
-        2.7e-3,
-        5e-3,
+        # 2.7e-3,
+        # 5e-3,
         1e-2,
         5e-2
      ]
@@ -186,7 +186,7 @@ def main(
     }
     
     combined_noise_models = {
-        **malicious_global,
+        # **malicious_global,
         **depol
     }
     
