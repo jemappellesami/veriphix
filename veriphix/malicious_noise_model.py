@@ -34,8 +34,6 @@ class MaliciousNoiseModel(NoiseModel):
         self.refresh_randomness()
 
     def refresh_randomness(self) -> None:
-        # self.node = random.choice(self.nodes)
-        # self.target_nodes = random.sample(self.nodes, self.n_targets)
         self.attack = bool(self.rng.uniform() < self.prob)
 
     def input_nodes(self, nodes: list[int]) -> Noise:
