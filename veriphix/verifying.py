@@ -161,6 +161,7 @@ class ClassicalComputationResult(ComputationResult):
 
     def analyze(self, result_analysis: ResultAnalysis, client: Client) -> None:
         output_string = "".join(str(int(v)) for v in self.outcomes.values())
+        self.outcome_string = client.output_predicate(output_string)
         result_analysis.computation_count += client.output_predicate(output_string)
         return
 
@@ -199,7 +200,7 @@ class TestResult(RunResult):
 class TrappifiedSchemeParameters:
     comp_rounds: int  # nr of comp rounds
     test_rounds: int  # nr of test rounds
-    threshold: int  # threshold (nr of allowed test rounds failure)
+    threshold: int = 0  # threshold (nr of allowed test rounds failure)
 
 
 @dataclass
