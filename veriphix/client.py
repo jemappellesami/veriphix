@@ -185,9 +185,19 @@ class Client:
             rng=rng,
             stacklevel=stacklevel + 1,
         )
-        self.trappifiedScheme = TrappifiedScheme(
-            params=self.parameters or TrappifiedSchemeParameters(20, 20, 5), test_runs=self.test_runs
-        )
+
+        if self.parameters:
+            alpha=1/2 # To compute from BQP error!
+            self.parameters.threshold = int(self.protocol.detection_rate * alpha * self.parameters.test_rounds)
+            self.trappifiedScheme = TrappifiedScheme(
+                params=self.parameters, test_runs=self.test_runs
+            )
+        else:
+            self.trappifiedScheme = TrappifiedScheme(
+                params= TrappifiedSchemeParameters(20, 20, 5), test_runs=self.test_runs
+            )
+            
+        
 
     @property
     def nodes(self) -> list[int]:

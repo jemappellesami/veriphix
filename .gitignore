@@ -6,3 +6,7 @@ __pycache__/
 .DS_Store
 .vscode/settings.json
 *.ipynb
+applications/gospel/circuits/
+applications/gospel/sampled_circuits/
+
+applications/circuits/

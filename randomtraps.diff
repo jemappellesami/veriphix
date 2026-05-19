@@ -1,0 +1,936 @@
+diff --git a/.github/workflows/ruff.yml b/.github/workflows/ruff.yml
+index 427e742..19b60ff 100644
+--- a/.github/workflows/ruff.yml
++++ b/.github/workflows/ruff.yml
+@@ -12,6 +12,7 @@ jobs:
+       - uses: chartboost/ruff-action@v1
+         with:
+           args: "check --output-format=github"
++          version: "0.15.12"
+ 
+   format:
+     runs-on: ubuntu-latest
+@@ -20,3 +21,4 @@ jobs:
+       - uses: chartboost/ruff-action@v1
+         with:
+           args: "format --check"
++          version: "0.15.12"
+diff --git a/tests/test_protocols.py b/tests/test_protocols.py
+index b008fe4..f2ba018 100644
+--- a/tests/test_protocols.py
++++ b/tests/test_protocols.py
+@@ -128,6 +128,51 @@ class TestProtocols:
+         assert decision
+         assert result_analysis.nr_failed_test_rounds == 0
+ 
++    def test_random_general_traps_average_detection_rate(self, fx_rng: np.random.Generator) -> None:
++        """
++        Showcase Lemma 8 behavior:
++        for any fixed non-empty Pauli X/Y support E, a uniformly random non-empty
++        subset H detects iff |E ∩ H| is odd, giving average detection ≈ 1/2.
++
++        This test intentionally checks the trap-selection logic, not backend physics.
++        """
++
++        nqubits = 2
++        depth = 2
++        circuit = rand_circuit(nqubits, depth, fx_rng)
++        pattern = circuit.transpile().pattern
++
++        secrets = Secrets(a=True, r=True, theta=True)
++        protocol = RandomTraps()
++        client = Client(pattern=pattern, secrets=secrets, protocol=protocol, rng=fx_rng)
++
++        nodes = list(client.nodes)
++        n = len(nodes)
++
++        # Fixed arbitrary Pauli deviation support:
++        # these are the qubits where the Pauli is X or Y after twirling.
++        error_size = int(fx_rng.integers(1, n + 1))
++        error_support = frozenset(fx_rng.choice(nodes, size=error_size, replace=False).tolist())
++
++        n_test_runs = 100
++        detections = 0
++
++        for _ in range(n_test_runs):
++            # IMPORTANT: sample uniformly from non-empty subsets.
++            # Your current rng.integers(n) excludes size n and allows size 0.
++            mask = fx_rng.integers(1, 2**n)
++            H = frozenset(nodes[i] for i in range(n) if (mask >> i) & 1)
++
++            detected = (len(error_support & H) % 2) == 1
++            detections += int(detected)
++
++        detection_rate = detections / n_test_runs
++
++        # With 100 samples, allow statistical slack.
++        assert 0.35 <= detection_rate <= 0.65, (
++            f"Expected ≈1/2 detection rate, got {detection_rate:.3f}; error_support={error_support}"
++        )
++
+     @pytest.mark.parametrize(
+         "odd_pair_generator",
+         [
+diff --git a/tests/test_vbqc.py b/tests/test_vbqc.py
+index 273979e..58b1af2 100644
+--- a/tests/test_vbqc.py
++++ b/tests/test_vbqc.py
+@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
+ 
+ import numpy as np
+ import pytest
+-from graphix.noise_models import DepolarisingNoiseModel, NoiseModel
++from graphix.noise_models import DepolarisingNoiseModel
+ from graphix.random_objects import rand_circuit
+ from graphix.sim.density_matrix import DensityMatrixBackend
+ from graphix.sim.statevec import StatevectorBackend
+@@ -16,6 +16,8 @@ from graphix_qasm_parser import OpenQASMParser
+ from veriphix.blinding import Secrets
+ from veriphix.client import Client
+ from veriphix.malicious_noise_model import MaliciousNoiseModel
++from veriphix.protocols import FK12, RandomTraps
++from veriphix.util_rounds import optimize_with_robustness_constraint
+ from veriphix.verifying import QuantumComputationResult, TrappifiedSchemeParameters
+ 
+ if TYPE_CHECKING:
+@@ -157,6 +159,164 @@ class TestVBQC:
+             trap_outcomes = test_run.delegate(backend=backend, noise_model=noise_model, rng=fx_rng).trap_outcomes
+             assert sum(trap_outcomes.values()) == 0
+ 
++    @pytest.mark.parametrize("noise_model_name", ["depolarising", "malicious"])
++    def test_random_traps_performance(self, fx_rng: Generator, noise_model_name: str) -> None:
++        """Check that RandomTraps detects deviations at the 1/2 rate expected by the literature [KKLM+22].
++
++        RandomTraps samples a fresh random multi-qubit trap for each test round via
++        sample_test_run, so no pre-computed test run list is needed. Under any deviation (here, depolarising/malicious noise), each
++        trap fires independently with probability ~1/2, giving an expected detection
++        rate of ≈1/2 over many rounds.
++
++        The canvas is configured with test rounds only (0 computation rounds).
++        The threshold is set to 0, arbitrarily.
++        After delegation, the empirical detection rate must fall in [0.35, 0.65].
++        """
++        nqubits = 2
++        depth = 2
++        circuit = rand_circuit(nqubits, depth, fx_rng)
++        pattern = circuit.transpile().pattern
++
++        secrets = Secrets(a=True, r=True, theta=True)
++        d, s, w = 0, 30, 0
++        parameters = TrappifiedSchemeParameters(comp_rounds=d, test_rounds=s, threshold=w)
++
++        client = Client(
++            pattern=pattern,
++            secrets=secrets,
++            protocol=RandomTraps(),
++            parameters=parameters,
++            rng=fx_rng,
++        )
++
++        if noise_model_name == "depolarising":
++            noise_model = DepolarisingNoiseModel(
++                measure_error_prob=1,
++                entanglement_error_prob=1,
++                x_error_prob=1,
++                z_error_prob=1,
++                measure_channel_prob=1,
++            )
++        elif noise_model_name == "malicious":
++            subset_size = int(fx_rng.integers(1, len(client.nodes)))
++            malicious_nodes = [int(node) for node in fx_rng.choice(client.nodes, size=subset_size, replace=False)]
++            noise_model = MaliciousNoiseModel(nodes=malicious_nodes, prob=1, rng=fx_rng)
++        else:
++            raise ValueError(f"Unknown noise model: {noise_model_name}")
++
++        canvas = client.sample_canvas(rng=fx_rng)
++        outcomes = client.delegate_canvas(
++            canvas=canvas, backend_cls=DensityMatrixBackend, noise_model=noise_model, rng=fx_rng
++        )
++        _, _, result_analysis = client.analyze_outcomes(canvas, outcomes)
++
++        detection_rate = result_analysis.nr_failed_test_rounds / s
++        assert 0.35 <= detection_rate <= 0.65, f"Expected ≈1/2 detection rate, got {detection_rate:.3f}"
++
++    def test_designed_rounds_bqp_circuit(self, fx_rng: Generator) -> None:
++        """Designed round counts tolerate sub-threshold malicious noise on the output node.
++
++        For each BQP circuit:
++        - optimize_with_robustness_constraint computes (d, s, w) from RandomTraps's
++          detection_rate with epsilon=1e-10 and rho_min=0.1.
++        - A MaliciousNoiseModel is applied exclusively on the output node(s) with
++          prob = rho_min / 2 = 0.05, strictly below the robustness threshold.
++        - Delegation runs under DensityMatrixBackend.
++
++        Because noise < rho_min, the protocol's guarantees hold: traps should still
++        pass and the majority-vote answer should match the expected BQP output.
++        """
++        rho_min = 0.1
++
++        with Path("tests/test_circuits/table.json").open() as f:
++            table = json.load(f)
++
++        for circuit_label, prob in table.items():
++            pattern = load_pattern_from_circuit(circuit_label)
++            correct_answer = round(prob)
++            secrets = Secrets(a=True, r=True, theta=True)
++
++            protocol = RandomTraps()
++            client = Client(pattern=pattern, secrets=secrets, protocol=protocol, rng=fx_rng)
++
++            design = optimize_with_robustness_constraint(
++                c=0,
++                detection_rate=protocol.detection_rate,
++                epsilon_target=1e-2,
++                rho_min=rho_min,
++                n_grid=200,
++            )
++
++            parameters = TrappifiedSchemeParameters(
++                comp_rounds=design.d,
++                test_rounds=design.s,
++                threshold=design.w,
++            )
++            client.trappifiedScheme.params = parameters
++
++            noise_model = MaliciousNoiseModel(
++                nodes=[int(n) for n in client.output_nodes],
++                prob=rho_min * 1,
++                rng=fx_rng,
++            )
++
++            canvas = client.sample_canvas(rng=fx_rng)
++            print(parameters)
++            outcomes = client.delegate_canvas(
++                canvas=canvas,
++                backend_cls=DensityMatrixBackend,
++                noise_model=noise_model,
++                rng=fx_rng,
++            )
++            traps_decision, computation_decision, _ = client.analyze_outcomes(canvas, outcomes)
++
++            assert traps_decision, f"{circuit_label}: honest server rejected"
++            assert int(computation_decision) == correct_answer, (
++                f"{circuit_label}: majority vote gave {int(computation_decision)}, expected {correct_answer}"
++            )
++
++    def test_designed_rounds_noiseless(self, fx_rng: Generator) -> None:
++        """Round counts from util_rounds integrate correctly with the VBQC pipeline.
++
++        Uses optimize_with_robustness_constraint to compute (d, s, w) from the
++        protocol's detection_rate, then feeds those values into TrappifiedSchemeParameters.
++        With a noiseless honest server, all traps must pass (traps_decision=True).
++
++        Loose security parameters (epsilon=0.05, rho_min=0.01, coarse grid) are used
++        to keep the optimised round counts small and the test fast.
++        """
++        nqubits = 2
++        depth = 3
++        circuit = rand_circuit(nqubits, depth, fx_rng)
++        pattern = circuit.transpile().pattern
++
++        protocol = FK12()
++
++        design = optimize_with_robustness_constraint(
++            c=0,
++            detection_rate=protocol.detection_rate,
++            epsilon_target=0.05,
++            rho_min=0.01,
++            n_grid=200,
++        )
++
++        assert design.total_bound <= 0.05
++        assert design.w_over_s >= 0.01
++
++        parameters = TrappifiedSchemeParameters(
++            comp_rounds=design.d,
++            test_rounds=design.s,
++            threshold=design.w,
++        )
++        secrets = Secrets(a=True, r=True, theta=True)
++        client = Client(pattern=pattern, secrets=secrets, protocol=protocol, parameters=parameters, rng=fx_rng)
++
++        canvas = client.sample_canvas(rng=fx_rng)
++        outcomes = client.delegate_canvas(canvas=canvas, backend_cls=StatevectorBackend, rng=fx_rng)
++        traps_decision, _, _ = client.analyze_outcomes(canvas, outcomes)
++
++        assert traps_decision
++
+     @pytest.mark.parametrize("noise_model_name", ["depolarising", "malicious"])
+     def test_noisy(self, fx_rng: Generator, noise_model_name: str) -> None:
+         nqubits = 3
+@@ -169,7 +329,6 @@ class TestVBQC:
+ 
+         client = Client(pattern=pattern, input_state=states, secrets=secrets, rng=fx_rng)
+ 
+-        noise_model: NoiseModel
+         if noise_model_name == "depolarising":
+             noise_model = DepolarisingNoiseModel(
+                 measure_error_prob=1,
+@@ -215,3 +374,12 @@ def find_correct_value(circuit_name: str) -> Outcome:
+         # return 0 else (no instance, as circuits are already filtered)
+         # print(table[circuit_name])
+         return round(table[circuit_name])
++
++
++def sample_non_empty_subset(nodes, rng: np.random.Generator) -> frozenset:
++    nodes = list(nodes)
++
++    while True:
++        keep = rng.random(len(nodes)) < 0.5
++        if keep.any():
++            return frozenset(node for node, k in zip(nodes, keep, strict=True) if k)
+diff --git a/veriphix/client.py b/veriphix/client.py
+index 73c3955..50caf29 100644
+--- a/veriphix/client.py
++++ b/veriphix/client.py
+@@ -257,7 +257,7 @@ class Client:
+         computation_rounds = set(rng.choice(N, size=self.trappifiedScheme.params.comp_rounds, replace=False))
+ 
+         return {
+-            r: self.computationRun if r in computation_rounds else self.test_runs[rng.integers(len(self.test_runs))]
++            r: self.computationRun if r in computation_rounds else self.protocol.sample_test_run(client=self, rng=rng)
+             for r in range(N)
+         }
+ 
+diff --git a/veriphix/malicious_noise_model.py b/veriphix/malicious_noise_model.py
+index b88df95..42707c1 100644
+--- a/veriphix/malicious_noise_model.py
++++ b/veriphix/malicious_noise_model.py
+@@ -58,7 +58,8 @@ class MaliciousNoiseModel(NoiseModel):
+ 
+     def __init__(self, nodes: list[int], prob: float = 0.0, rng: Generator | None = None) -> None:
+         self.prob = prob
+-        self.nodes: set[int] = {int(node) for node in nodes}  # ✅ Explicitly annotate as set[int]
++        self.nodes = nodes
++        self.nodes = {int(node) for node in nodes}
+         self.refresh_randomness(rng)
+ 
+     def refresh_randomness(self, rng: Generator | None = None) -> None:
+diff --git a/veriphix/protocols.py b/veriphix/protocols.py
+index 3764831..a6d4d28 100644
+--- a/veriphix/protocols.py
++++ b/veriphix/protocols.py
+@@ -40,16 +40,34 @@ class GraphStabilizer:
+ 
+ 
+ class VerificationProtocol(ABC):
++    @property
++    @abstractmethod
++    def detection_rate(self) -> float:
++        pass
++
+     @abstractmethod
+     def create_test_runs(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> list[TestRun]:
+         pass
+ 
++    @abstractmethod
++    def sample_test_run(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> TestRun:
++        pass
++
+ 
+ class FK12(VerificationProtocol):
+     def __init__(self, manual_colouring: Sequence[set[int]] | None = None) -> None:
+         super().__init__()
+         self.manual_colouring = manual_colouring
+ 
++    @property
++    @override
++    def detection_rate(self) -> float:
++        return self._detection_rate
++
++    @detection_rate.setter
++    def detection_rate(self, value: float) -> None:
++        self._detection_rate = value
++
+     @override
+     def create_test_runs(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> list[TestRun]:
+         """Creates test runs according to a graph colouring according to [FK12].
+@@ -120,9 +138,14 @@ class FK12(VerificationProtocol):
+             test_run = TestRun(client=client, traps=traps)
+             test_runs.append(test_run)
+ 
+-        # print(test_runs)
++        self._detection_rate = 1 / len(test_runs)
+         return test_runs
+ 
++    @override
++    def sample_test_run(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> TestRun:
++        rng = ensure_rng(rng, stacklevel=stacklevel + 1)
++        return client.test_runs[rng.integers(len(client.test_runs))]
++
+ 
+ def get_bipartite_coloring(pattern: Pattern) -> tuple[set[int], set[int]]:
+     """Return a bipartite coloring for the given pattern."""
+@@ -153,31 +176,33 @@ def get_node_positions(pattern: Pattern, scale: float = 1, reverse_qubit_order:
+ 
+ 
+ class RandomTraps(VerificationProtocol):
+-    """
+-    A bad and naive way of generating traps, but exposing the modularity of the interface.
+-    """
+-
+     def __init__(self) -> None:
+         super().__init__()
++        self._detection_rate = 1 / 2
++
++    @property
++    @override
++    def detection_rate(self) -> float:
++        return self._detection_rate
++
++    @detection_rate.setter
++    def detection_rate(self, value: float) -> None:
++        self._detection_rate = value
+ 
+     @override
+     def create_test_runs(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> list[TestRun]:
++        return []
++
++    @override
++    def sample_test_run(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> TestRun:
+         rng = ensure_rng(rng, stacklevel=stacklevel + 1)
+-        test_runs = []
+-        # Create 1 random trap per node
+         n = len(client.graph.nodes)
+-        for _ in range(n):
+-            # Choose a random subset of nodes to create a trap (random size, random nodes)
+-            trap_size = rng.integers(n)
+-            random_nodes = [client.nodes[i] for i in rng.choice(len(client.nodes), size=trap_size, replace=False)]
+-            # Create a single-trap test round from it. The trap is multi-qubit.
+-            random_multi_qubit_trap = frozenset(random_nodes)
+-            # Only one trap
+-            traps = frozenset({random_multi_qubit_trap})
+-            test_run = TestRun(client=client, traps=traps)
+-            test_runs.append(test_run)
+-
+-        return test_runs
++        trap_size = rng.integers(n)
++        random_nodes: list[int] = [
++            client.nodes[i] for i in rng.choice(len(client.nodes), size=trap_size, replace=False)
++        ]
++        traps = frozenset({frozenset(random_nodes)})
++        return TestRun(client=client, traps=traps)
+ 
+ 
+ def _odd_pair_generators_bfs(
+@@ -302,6 +327,16 @@ class Dummyless(VerificationProtocol):
+     def __init__(self, odd_pair_generator: OddPairGeneratorFn = _odd_pair_generators_bfs) -> None:
+         super().__init__()
+         self.odd_pair_generator = odd_pair_generator
++        self._detection_rate = 1 / 14
++
++    @property
++    @override
++    def detection_rate(self) -> float:
++        return self._detection_rate
++
++    @detection_rate.setter
++    def detection_rate(self, value: float) -> None:
++        self._detection_rate = value
+ 
+     @override
+     def create_test_runs(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> list[TestRun]:
+@@ -331,4 +366,11 @@ class Dummyless(VerificationProtocol):
+         generators.extend(self.odd_pair_generator(client.graph, stabdict, rfull))
+ 
+         # Step 3: build TestRuns — each generator's node_indices form one multi-qubit trap
+-        return [TestRun(client=client, traps=frozenset({frozenset(gs.node_indices)})) for gs in generators]
++        test_runs = [TestRun(client=client, traps=frozenset({frozenset(gs.node_indices)})) for gs in generators]
++        self._detection_rate = 1 / len(test_runs)
++        return test_runs
++
++    @override
++    def sample_test_run(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> TestRun:
++        rng = ensure_rng(rng, stacklevel=stacklevel + 1)
++        return client.test_runs[rng.integers(len(client.test_runs))]
+diff --git a/veriphix/util_rounds.py b/veriphix/util_rounds.py
+new file mode 100644
+index 0000000..333ece4
+--- /dev/null
++++ b/veriphix/util_rounds.py
+@@ -0,0 +1,485 @@
++from __future__ import annotations
++
++import math
++from dataclasses import dataclass
++from typing import TYPE_CHECKING
++
++if TYPE_CHECKING:
++    from collections.abc import Callable
++
++
++@dataclass
++class DesignResult:
++    detection_rate: float
++    epsilon_target: float
++    alpha: float
++    delta_tilde: float
++    lambda_phi: float
++    d: int
++    s: int
++    w: int
++    w_over_s: float
++    w_over_s_target: float
++    eps_test_bound: float
++    eps_comp_bound: float
++    total_bound: float
++    objective_value: float
++
++
++def alpha_from_c(c: float) -> float:
++    if not (0.0 <= c < 0.5):
++        raise ValueError("Need 0 <= c < 1/2.")
++    return (1.0 - 2.0 * c) / (2.0 - 2.0 * c)
++
++
++def safe_exp(x: float) -> float:
++    if x < -745:
++        return 0.0
++    if x > 709:
++        return float("inf")
++    return math.exp(x)
++
++
++def bounds_corrected_delta(
++    c: float,
++    detection_rate: float,
++    delta_tilde: float,
++    d: int,
++    s: int,
++    lambda_phi: float = 0.5,
++) -> dict:
++    alpha = alpha_from_c(c)
++
++    if not (0.0 < detection_rate <= 1.0):
++        raise ValueError("Need 0 < detection_rate <= 1.")
++    if d <= 0 or s <= 0:
++        raise ValueError("Need d,s >= 1.")
++    if not (0.0 < delta_tilde < alpha):
++        raise ValueError("Need 0 < delta_tilde < alpha.")
++    if not (0.0 < lambda_phi < 1.0):
++        raise ValueError("Need 0 < lambda_phi < 1.")
++
++    # w/s target = (alpha - delta_tilde) * detection_rate
++    w_over_s_target = (alpha - delta_tilde) * detection_rate
++    if not (0.0 <= w_over_s_target < alpha * detection_rate + 1e-15):
++        raise ValueError("w/s target outside admissible range.")
++
++    # floor preserves w/s <= target
++    w = math.floor(s * w_over_s_target)
++    w_over_s_actual = w / s
++
++    phi = lambda_phi * delta_tilde
++
++    chi_test = (delta_tilde - phi) / 2.0  # = (1-lambda_phi)*delta_tilde/2
++    chi_comp = phi / 2.0  # = lambda_phi*delta_tilde/2
++
++    # ---- epsilon bound (test side) ----
++    term1_test = safe_exp(-2.0 * (chi_test**2) * s)
++
++    denom_test = alpha - phi - chi_test
++    if denom_test <= 0:
++        raise ValueError("Need alpha - phi - chi_test > 0.")
++
++    gap_test = denom_test * detection_rate - w_over_s_actual
++    term2_test = safe_exp(-2.0 * (gap_test**2) / denom_test * s)
++
++    eps_test = term1_test + term2_test
++
++    # ---- nu bound (computation side) ----
++    term1_comp = safe_exp(-2.0 * (chi_comp**2) * d)
++
++    denom_comp = (1.0 - alpha) + phi / 2.0
++    if denom_comp <= 0:
++        raise ValueError("Need (1-alpha) + phi/2 > 0.")
++
++    gap_comp = denom_comp * (1.0 - c) - 0.5
++    term2_comp = safe_exp(-2.0 * (gap_comp**2) / denom_comp * d)
++
++    eps_comp = term1_comp + term2_comp
++
++    return {
++        "alpha": alpha,
++        "phi": phi,
++        "chi_test": chi_test,
++        "chi_comp": chi_comp,
++        "w": w,
++        "w_over_s_actual": w_over_s_actual,
++        "w_over_s_target": w_over_s_target,
++        "eps_test": eps_test,
++        "eps_comp": eps_comp,
++        "total_bound": max(eps_test, eps_comp),
++    }
++
++
++def _binary_search_min_int(ok_fn, hi_max: int) -> int:
++    lo, hi = 1, 1
++    while hi <= hi_max and not ok_fn(hi):
++        hi *= 2
++    if hi > hi_max:
++        raise RuntimeError(f"Could not find feasible value up to {hi_max}.")
++    lo = hi // 2 if hi > 1 else 1
++    while lo < hi:
++        mid = (lo + hi) // 2
++        if ok_fn(mid):
++            hi = mid
++        else:
++            lo = mid + 1
++    return lo
++
++
++def min_rounds_for_delta_tilde(
++    c: float,
++    detection_rate: float,
++    epsilon_target: float,
++    delta_tilde: float,
++    lambda_phi: float = 0.5,
++    d_max: int = 10**7,
++    s_max: int = 10**7,
++) -> DesignResult:
++    alpha = alpha_from_c(c)
++
++    if not (0.0 < epsilon_target < 1.0):
++        raise ValueError("Need 0 < epsilon_target < 1.")
++    if not (0.0 < delta_tilde < alpha):
++        raise ValueError("Need 0 < delta_tilde < alpha.")
++    if not (0.0 < lambda_phi < 1.0):
++        raise ValueError("Need 0 < lambda_phi < 1.")
++
++    def test_ok(s: int) -> bool:
++        vals = bounds_corrected_delta(
++            c=c,
++            detection_rate=detection_rate,
++            delta_tilde=delta_tilde,
++            d=1,
++            s=s,
++            lambda_phi=lambda_phi,
++        )
++        return vals["eps_test"] <= epsilon_target
++
++    def comp_ok(d: int) -> bool:
++        vals = bounds_corrected_delta(
++            c=c,
++            detection_rate=detection_rate,
++            delta_tilde=delta_tilde,
++            d=d,
++            s=1,
++            lambda_phi=lambda_phi,
++        )
++        return vals["eps_comp"] <= epsilon_target
++
++    s_star = _binary_search_min_int(test_ok, s_max)
++    d_star = _binary_search_min_int(comp_ok, d_max)
++
++    vals = bounds_corrected_delta(
++        c=c,
++        detection_rate=detection_rate,
++        delta_tilde=delta_tilde,
++        d=d_star,
++        s=s_star,
++        lambda_phi=lambda_phi,
++    )
++
++    return DesignResult(
++        detection_rate=detection_rate,
++        epsilon_target=epsilon_target,
++        alpha=alpha,
++        delta_tilde=delta_tilde,
++        lambda_phi=lambda_phi,
++        d=d_star,
++        s=s_star,
++        w=vals["w"],
++        w_over_s=vals["w_over_s_actual"],
++        w_over_s_target=vals["w_over_s_target"],
++        eps_test_bound=vals["eps_test"],
++        eps_comp_bound=vals["eps_comp"],
++        total_bound=vals["total_bound"],
++        objective_value=float(d_star + s_star),
++    )
++
++
++def _default_objective(res: DesignResult) -> float:
++    return res.d + res.s
++
++
++def optimize_with_robustness_constraint(
++    c: float,
++    detection_rate: float,
++    epsilon_target: float,
++    rho_min: float,
++    lambda_phi: float = 0.5,
++    n_grid: int = 3000,
++    objective: Callable[[DesignResult], float] | None = None,
++) -> DesignResult:
++    """Minimize objective over delta_tilde, with fixed lambda_phi, subject to:
++    - total security bound <= epsilon_target
++    - w/s >= rho_min
++    """
++    alpha = alpha_from_c(c)
++
++    if not (0.0 <= rho_min < alpha * detection_rate):
++        raise ValueError(f"Need 0 <= rho_min < alpha * detection_rate = {alpha * detection_rate:.6g}")
++    if not (0.0 < lambda_phi < 1.0):
++        raise ValueError("Need 0 < lambda_phi < 1.")
++
++    delta_min = 1e-12
++    delta_max = alpha - rho_min / detection_rate
++
++    if delta_max <= delta_min:
++        raise ValueError("No feasible delta interval for this rho_min.")
++
++    if objective is None:
++        objective = _default_objective
++
++    best: DesignResult | None = None
++
++    for i in range(n_grid):
++        delta_tilde = delta_min + (delta_max - delta_min) * i / (n_grid - 1)
++        try:
++            res = min_rounds_for_delta_tilde(
++                c=c,
++                detection_rate=detection_rate,
++                epsilon_target=epsilon_target,
++                delta_tilde=delta_tilde,
++                lambda_phi=lambda_phi,
++            )
++            if res.w_over_s < rho_min:
++                continue
++
++            res.objective_value = float(objective(res))
++            if best is None or res.objective_value < best.objective_value:
++                best = res
++        except (ValueError, RuntimeError):
++            continue
++
++    if best is None:
++        raise RuntimeError("No feasible design found.")
++
++    return best
++
++
++def optimize_with_robustness_constraint_over_lambda(
++    c: float,
++    detection_rate: float,
++    epsilon_target: float,
++    rho_min: float,
++    n_grid_delta: int = 3000,
++    n_grid_lambda: int = 101,
++    lambda_min: float = 1e-6,
++    lambda_max: float = 1.0 - 1e-6,
++    objective: Callable[[DesignResult], float] | None = None,
++) -> DesignResult:
++    """Minimize objective jointly over delta_tilde and lambda_phi, subject to:
++      - total security bound <= epsilon_target
++      - w/s >= rho_min
++
++    lambda_phi is searched on a grid in (0,1).
++    """
++    alpha = alpha_from_c(c)
++
++    if not (0.0 <= rho_min < alpha * detection_rate):
++        raise ValueError(f"Need 0 <= rho_min < alpha * detection_rate = {alpha * detection_rate:.6g}")
++    if not (0.0 < lambda_min < lambda_max < 1.0):
++        raise ValueError("Need 0 < lambda_min < lambda_max < 1.")
++    if n_grid_delta < 2 or n_grid_lambda < 2:
++        raise ValueError("Need n_grid_delta >= 2 and n_grid_lambda >= 2.")
++
++    delta_min = 1e-12
++    delta_max = alpha - rho_min / detection_rate
++
++    if delta_max <= delta_min:
++        raise ValueError("No feasible delta interval for this rho_min.")
++
++    if objective is None:
++        objective = _default_objective
++
++    best: DesignResult | None = None
++
++    for j in range(n_grid_lambda):
++        lambda_phi = lambda_min + (lambda_max - lambda_min) * j / (n_grid_lambda - 1)
++
++        for i in range(n_grid_delta):
++            delta_tilde = delta_min + (delta_max - delta_min) * i / (n_grid_delta - 1)
++            try:
++                res = min_rounds_for_delta_tilde(
++                    c=c,
++                    detection_rate=detection_rate,
++                    epsilon_target=epsilon_target,
++                    delta_tilde=delta_tilde,
++                    lambda_phi=lambda_phi,
++                )
++                if res.w_over_s < rho_min:
++                    continue
++
++                res.objective_value = float(objective(res))
++                if best is None or res.objective_value < best.objective_value:
++                    best = res
++            except (ValueError, RuntimeError):
++                continue
++
++    if best is None:
++        raise RuntimeError("No feasible design found.")
++
++    return best
++
++
++def maximize_robustness_under_budget(
++    c: float,
++    detection_rate: float,
++    epsilon_target: float,
++    budget: int,
++    lambda_phi: float = 0.5,
++    n_grid: int = 3000,
++) -> DesignResult:
++    """Among all designs with d+s <= budget and security <= epsilon_target,
++    maximize actual w/s for fixed lambda_phi. Ties broken by smaller d+s.
++    """
++    alpha = alpha_from_c(c)
++
++    if not (0.0 < lambda_phi < 1.0):
++        raise ValueError("Need 0 < lambda_phi < 1.")
++
++    best: DesignResult | None = None
++
++    for i in range(n_grid):
++        delta_tilde = 1e-12 + (alpha - 2e-12) * i / (n_grid - 1)
++        try:
++            res = min_rounds_for_delta_tilde(
++                c=c,
++                detection_rate=detection_rate,
++                epsilon_target=epsilon_target,
++                delta_tilde=delta_tilde,
++                lambda_phi=lambda_phi,
++            )
++            if res.d + res.s > budget:
++                continue
++
++            if best is None:
++                best = res
++            else:
++                if res.w_over_s > best.w_over_s:
++                    best = res
++                elif res.w_over_s == best.w_over_s and (res.d + res.s) < (best.d + best.s):
++                    best = res
++        except (ValueError, RuntimeError):
++            continue
++
++    if best is None:
++        raise RuntimeError("No feasible design found under the given budget.")
++
++    best.objective_value = float(best.d + best.s)
++    return best
++
++
++def maximize_robustness_under_budget_over_lambda(
++    c: float,
++    detection_rate: float,
++    epsilon_target: float,
++    budget: int,
++    n_grid_delta: int = 3000,
++    n_grid_lambda: int = 101,
++    lambda_min: float = 1e-6,
++    lambda_max: float = 1.0 - 1e-6,
++) -> DesignResult:
++    """Among all designs with d+s <= budget and security <= epsilon_target,
++    maximize actual w/s, jointly over delta_tilde and lambda_phi.
++    Ties broken by smaller d+s.
++    """
++    alpha = alpha_from_c(c)
++
++    if not (0.0 < lambda_min < lambda_max < 1.0):
++        raise ValueError("Need 0 < lambda_min < lambda_max < 1.")
++    if n_grid_delta < 2 or n_grid_lambda < 2:
++        raise ValueError("Need n_grid_delta >= 2 and n_grid_lambda >= 2.")
++
++    best: DesignResult | None = None
++
++    for j in range(n_grid_lambda):
++        lambda_phi = lambda_min + (lambda_max - lambda_min) * j / (n_grid_lambda - 1)
++
++        for i in range(n_grid_delta):
++            delta_tilde = 1e-12 + (alpha - 2e-12) * i / (n_grid_delta - 1)
++            try:
++                res = min_rounds_for_delta_tilde(
++                    c=c,
++                    detection_rate=detection_rate,
++                    epsilon_target=epsilon_target,
++                    delta_tilde=delta_tilde,
++                    lambda_phi=lambda_phi,
++                )
++                if res.d + res.s > budget:
++                    continue
++
++                if best is None:
++                    best = res
++                else:
++                    if res.w_over_s > best.w_over_s:
++                        best = res
++                    elif res.w_over_s == best.w_over_s and (res.d + res.s) < (best.d + best.s):
++                        best = res
++            except (ValueError, RuntimeError):
++                continue
++
++    if best is None:
++        raise RuntimeError("No feasible design found under the given budget.")
++
++    best.objective_value = float(best.d + best.s)
++    return best
++
++
++if __name__ == "__main__":
++    c = 0
++    detection_rate = 0.5  # FK12 / RandomTraps: detection_rate = 1/2
++    epsilon_target = 1e-6
++    rho_min = 0.1
++
++    best = optimize_with_robustness_constraint_over_lambda(
++        c=c,
++        detection_rate=detection_rate,
++        epsilon_target=epsilon_target,
++        rho_min=rho_min,
++        n_grid_delta=4000,
++        n_grid_lambda=11,
++    )
++
++    print("Best design with robustness constraint (optimized over lambda)")
++    print("-------------------------------------------------------------")
++    print(f"detection_rate       = {best.detection_rate:.10f}")
++    print(f"alpha                = {best.alpha:.10f}")
++    print(f"delta_tilde          = {best.delta_tilde:.10f}")
++    print(f"lambda_phi           = {best.lambda_phi:.10f}")
++    print(f"d                    = {best.d}")
++    print(f"s                    = {best.s}")
++    print(f"w                    = {best.w}")
++    print(f"w/s (actual)         = {best.w_over_s:.10f}")
++    print(f"w/s (target)         = {best.w_over_s_target:.10f}")
++    print(f"test bound           = {best.eps_test_bound:.3e}")
++    print(f"comp bound           = {best.eps_comp_bound:.3e}")
++    print(f"total bound          = {best.total_bound:.3e}")
++    print(f"objective (d+s)      = {best.objective_value:.1f}")
++
++    budget = 1000
++    best2 = maximize_robustness_under_budget_over_lambda(
++        c=c,
++        detection_rate=detection_rate,
++        epsilon_target=epsilon_target,
++        budget=budget,
++        n_grid_delta=4000,
++        n_grid_lambda=11,
++    )
++
++    print()
++    print("Best design under budget (optimized over lambda)")
++    print("-----------------------------------------------")
++    print(f"budget               = {budget}")
++    print(f"detection_rate       = {best2.detection_rate:.10f}")
++    print(f"delta_tilde          = {best2.delta_tilde:.10f}")
++    print(f"lambda_phi           = {best2.lambda_phi:.10f}")
++    print(f"d                    = {best2.d}")
++    print(f"s                    = {best2.s}")
++    print(f"w                    = {best2.w}")
++    print(f"w/s (actual)         = {best2.w_over_s:.10f}")
++    print(f"w/s (target)         = {best2.w_over_s_target:.10f}")
++    print(f"test bound           = {best2.eps_test_bound:.3e}")
++    print(f"comp bound           = {best2.eps_comp_bound:.3e}")
++    print(f"total bound          = {best2.total_bound:.3e}")
++    print(f"objective (d+s)      = {best2.objective_value:.1f}")
