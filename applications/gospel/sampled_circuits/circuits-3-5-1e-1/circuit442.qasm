@@ -1,0 +1,9 @@
+OPENQASM 2.0;
+include "qelib1.inc";
+qreg q443[3];
+cx q443[0],q443[1];
+rx(pi/2) q443[2];
+rz(pi) q443[2];
+rx(7*pi/4) q443[0];
+cx q443[2],q443[1];
+cx q443[0],q443[1];

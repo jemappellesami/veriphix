@@ -1,0 +1,9 @@
+OPENQASM 2.0;
+include "qelib1.inc";
+qreg q865[4];
+rz(pi) q865[0];
+rx(7*pi/4) q865[0];
+rx(pi/4) q865[3];
+cx q865[2],q865[3];
+cx q865[2],q865[1];
+cx q865[0],q865[1];

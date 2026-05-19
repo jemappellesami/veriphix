@@ -1,0 +1,10 @@
+OPENQASM 2.0;
+include "qelib1.inc";
+qreg q815[4];
+rz(3*pi/4) q815[1];
+rz(3*pi/2) q815[2];
+rx(5*pi/4) q815[2];
+cx q815[2],q815[3];
+cx q815[2],q815[1];
+cx q815[1],q815[0];
+rx(pi/4) q815[1];

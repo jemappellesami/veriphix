@@ -1,0 +1,12 @@
+OPENQASM 2.0;
+include "qelib1.inc";
+qreg q264[4];
+rx(pi) q264[1];
+rz(pi/4) q264[1];
+rx(7*pi/4) q264[2];
+rx(5*pi/4) q264[3];
+cx q264[2],q264[1];
+cx q264[2],q264[3];
+cx q264[1],q264[2];
+cx q264[1],q264[0];
+rx(pi/4) q264[1];
