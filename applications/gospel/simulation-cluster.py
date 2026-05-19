@@ -168,6 +168,17 @@ def _get_cluster(
     return cluster
 
 
+def _load_done(path: Path) -> set[tuple[str, str, str, str, str]]:
+    """Return the set of (p_ent, width, depth, bqp_error, circuit_label) already in the CSV."""
+    if not path.exists() or path.stat().st_size == 0:
+        return set()
+    with path.open(newline="") as f:
+        return {
+            (row["p_ent"], row["width"], row["depth"], row["bqp_error"], row["circuit_label"])
+            for row in csv.DictReader(f)
+        }
+
+
 def _parse_folder(name: str) -> tuple[int, int, str] | None:
     m = FOLDER_RE.match(name)
     return (int(m.group(1)), int(m.group(2)), m.group(3)) if m else None
@@ -218,9 +229,17 @@ def main(
                     seed=child_seed,
                 ))
 
-    typer.echo(f"{len(runs)} runs across {len(folders)} folders × {len(ENT_ERRORS)} noise levels")
-
     out_csv.parent.mkdir(parents=True, exist_ok=True)
+    done = _load_done(out_csv)
+    if done:
+        typer.echo(f"Resuming: {len(done)} runs already in {out_csv}")
+    runs = [
+        r for r in runs
+        if (str(r.p_ent), str(r.width), str(r.depth), r.bqp_error, Path(r.circuit_path).name) not in done
+    ]
+
+    typer.echo(f"{len(runs)} runs to submit across {len(folders)} folders × {len(ENT_ERRORS)} noise levels")
+
     is_new = not out_csv.exists() or out_csv.stat().st_size == 0
 
     cluster = _get_cluster(walltime, memory, cores, port, scale)

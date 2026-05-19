@@ -35,7 +35,7 @@ SAMPLED_BASE = Path("applications/gospel/sampled_circuits")
 
 ENT_ERRORS: list[float] = list(np.logspace(-6, -1, num=10))
 
-CSV_HEADER = ["p_ent", "width", "depth", "bqp_error", "n_circuits", "p_failed_round", "p_false_reject"]
+CSV_HEADER = ["p_ent", "width", "depth", "bqp_error", "circuit_label", "traps_passed", "nr_failed_test_rounds", "test_rounds"]
 
 FOLDER_RE = re.compile(r"^circuits-(\d+)-(\d+)-(.+)$")
 
@@ -45,6 +45,17 @@ FOLDER_RE = re.compile(r"^circuits-(\d+)-(\d+)-(.+)$")
 def _fmt_time(seconds: float) -> str:
     m, s = divmod(int(seconds), 60)
     return f"{m}m{s:02d}s" if m else f"{s}s"
+
+
+def _load_done(path: Path) -> set[tuple[str, str, str, str, str]]:
+    """Return the set of (p_ent, width, depth, bqp_error, circuit_label) already in the CSV."""
+    if not path.exists() or path.stat().st_size == 0:
+        return set()
+    with path.open(newline="") as f:
+        return {
+            (row["p_ent"], row["width"], row["depth"], row["bqp_error"], row["circuit_label"])
+            for row in csv.DictReader(f)
+        }
 
 
 def _open_csv(path: Path) -> tuple[csv.DictWriter, object]:
@@ -92,6 +103,9 @@ def main(
         raise typer.Exit(1)
 
     out_csv.parent.mkdir(parents=True, exist_ok=True)
+    done = _load_done(out_csv)
+    if done:
+        typer.echo(f"Resuming: {len(done)} runs already in {out_csv}")
     csv_writer, csv_fh = _open_csv(out_csv)
 
     total = len(folders) * len(ENT_ERRORS)
@@ -127,10 +141,10 @@ def main(
                     measure_channel_prob=0.0,
                 )
 
-                failed_round_fractions: list[float] = []
-                false_rejects: list[bool] = []
-
                 for c_idx, circuit_path in enumerate(circuit_files):
+                    if (str(p_ent), str(width), str(depth), bqp_tag, circuit_path.name) in done:
+                        continue
+
                     elapsed = time.monotonic() - t_cell_start
                     avg = elapsed / c_idx if c_idx > 0 else 0.0
                     eta = avg * (len(circuit_files) - c_idx)
@@ -163,32 +177,26 @@ def main(
                     )
                     traps_ok, _, result_analysis = client.analyze_outcomes(canvas, outcomes)
 
-                    failed_round_fractions.append(result_analysis.nr_failed_test_rounds / test_rounds)
-                    false_rejects.append(not traps_ok)
+                    csv_writer.writerow({
+                        "p_ent":                  p_ent,
+                        "width":                  width,
+                        "depth":                  depth,
+                        "bqp_error":              bqp_tag,
+                        "circuit_label":          circuit_path.name,
+                        "traps_passed":           traps_ok,
+                        "nr_failed_test_rounds":  result_analysis.nr_failed_test_rounds,
+                        "test_rounds":            test_rounds,
+                    })
+                    csv_fh.flush()  # type: ignore[union-attr]
 
-                p_failed_round = float(np.mean(failed_round_fractions))
-                p_false_reject = float(np.mean(false_rejects))
-
-                csv_writer.writerow({
-                    "p_ent":          p_ent,
-                    "width":          width,
-                    "depth":          depth,
-                    "bqp_error":      bqp_tag,
-                    "n_circuits":     len(circuit_files),
-                    "p_failed_round": p_failed_round,
-                    "p_false_reject": p_false_reject,
-                })
-                csv_fh.flush()  # type: ignore[union-attr]
-
-                cell_time     = time.monotonic() - t_cell_start
+                cell_time      = time.monotonic() - t_cell_start
                 folder_elapsed = time.monotonic() - t_folder_start
-                run_elapsed   = time.monotonic() - t_run_start
-                avg_grand     = run_elapsed / grand_cell
-                eta_total     = avg_grand * (total - grand_cell)
+                run_elapsed    = time.monotonic() - t_run_start
+                avg_grand      = run_elapsed / grand_cell
+                eta_total      = avg_grand * (total - grand_cell)
 
                 typer.echo(
-                    f"  p_ent={p_ent:.1e}  p_failed_round={p_failed_round:.4f}"
-                    f"  p_false_reject={p_false_reject:.4f}"
+                    f"  p_ent={p_ent:.1e} [{p_idx+1}/{len(ENT_ERRORS)}] done"
                     f"  | cell {_fmt_time(cell_time)}"
                     f"  folder {_fmt_time(folder_elapsed)}"
                     f"  total {_fmt_time(run_elapsed)}"
