@@ -19,6 +19,8 @@ import csv
 import dataclasses
 import json
 import re
+import time
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
@@ -62,6 +64,7 @@ class Result:
     traps_passed: bool
     nr_failed_test_rounds: int
     test_rounds: int
+    elapsed_s: float = 0.0  # wall-time for this run; not written to CSV
 
 
 @dataclass(frozen=True)
@@ -72,9 +75,23 @@ class Failure:
     bqp_error: str
     circuit_label: str
     error: str
+    elapsed_s: float = 0.0
 
 
-CSV_FIELDS = [f.name for f in dataclasses.fields(Result)]
+CSV_FIELDS = [f.name for f in dataclasses.fields(Result) if f.name != "elapsed_s"]
+
+FolderKey = tuple[int, int, str]
+
+
+def _fmt_duration(seconds: float) -> str:
+    s = int(seconds)
+    h, rem = divmod(s, 3600)
+    m, sec = divmod(rem, 60)
+    if h:
+        return f"{h}h{m:02d}m"
+    if m:
+        return f"{m}m{sec:02d}s"
+    return f"{sec}s"
 
 
 # ── run unit ──────────────────────────────────────────────────────────────────
@@ -90,6 +107,7 @@ class Run:
     seed: int
 
     def execute(self) -> Result | Failure:
+        t0 = time.monotonic()
         circuit_path = Path(self.circuit_path)
         try:
             with circuit_path.open() as f:
@@ -134,6 +152,7 @@ class Run:
                 traps_passed=traps_ok,
                 nr_failed_test_rounds=result_analysis.nr_failed_test_rounds,
                 test_rounds=self.test_rounds,
+                elapsed_s=time.monotonic() - t0,
             )
         except Exception as exc:
             return Failure(
@@ -143,6 +162,7 @@ class Run:
                 bqp_error=self.bqp_error,
                 circuit_label=Path(self.circuit_path).name,
                 error=str(exc),
+                elapsed_s=time.monotonic() - t0,
             )
 
 
@@ -253,7 +273,16 @@ def main(
 
     futures = [dask_client.submit(Run.execute, run, pure=False) for run in runs]
 
+    # Per-folder totals (keyed by (width, depth, bqp_error))
+    folder_total: dict[FolderKey, int] = defaultdict(int)
+    folder_done:  dict[FolderKey, int] = defaultdict(int)
+    folder_time:  dict[FolderKey, float] = defaultdict(float)
+    for r in runs:
+        folder_total[(r.width, r.depth, r.bqp_error)] += 1
+
     n_ok = n_fail = 0
+    loop_start = time.monotonic()
+
     with out_csv.open("a", newline="") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=CSV_FIELDS)
         if is_new:
@@ -266,8 +295,22 @@ def main(
                 typer.echo(f"Future error: {exc}")
                 continue
 
+            fkey: FolderKey = (report.width, report.depth, report.bqp_error)
+            folder_done[fkey] += 1
+            folder_time[fkey] += report.elapsed_s
+
+            wall_elapsed = time.monotonic() - loop_start
+            n_done = n_ok + n_fail + 1
+            throughput = n_done / wall_elapsed          # runs/s (reflects parallelism)
+            remaining = len(runs) - n_done
+            eta_str = _fmt_duration(remaining / throughput) if throughput > 0 else "?"
+
+            f_done = folder_done[fkey]
+            f_total = folder_total[fkey]
+            f_avg = folder_time[fkey] / f_done
+
             if isinstance(report, Result):
-                writer.writerow(dataclasses.asdict(report))
+                writer.writerow({k: v for k, v in dataclasses.asdict(report).items() if k in CSV_FIELDS})
                 csvfile.flush()
                 n_ok += 1
                 typer.echo(
@@ -275,11 +318,17 @@ def main(
                     f"n={report.width} d={report.depth} p={report.p_ent:.1e} "
                     f"{report.circuit_label}  "
                     f"traps={'✓' if report.traps_passed else '✗'}  "
-                    f"failed={report.nr_failed_test_rounds}/{report.test_rounds}"
+                    f"failed={report.nr_failed_test_rounds}/{report.test_rounds}  "
+                    f"t={report.elapsed_s:.1f}s  "
+                    f"folder {f_done}/{f_total} avg={f_avg:.1f}s/run  "
+                    f"ETA {eta_str}"
                 )
             elif isinstance(report, Failure):
                 n_fail += 1
-                typer.echo(f"✗ {report.circuit_label} p={report.p_ent:.1e}: {report.error}")
+                typer.echo(
+                    f"✗ [{n_ok+n_fail}/{len(runs)}] {report.circuit_label} p={report.p_ent:.1e}  "
+                    f"t={report.elapsed_s:.1f}s  ETA {eta_str}: {report.error}"
+                )
 
     typer.echo(f"\nDone. {n_ok} results, {n_fail} failures → {out_csv}")
 
