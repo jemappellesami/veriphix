@@ -47,7 +47,6 @@ ENT_ERRORS.pop(0)
 ENT_ERRORS.pop(0)
 ENT_ERRORS.pop(0)
 ENT_ERRORS.pop(0)
-print(ENT_ERRORS)
 FOLDER_RE = re.compile(r"^circuits-(\d+)-(\d+)-(.+)$")
 
 
