@@ -41,9 +41,13 @@ app = typer.Typer(add_completion=False)
 
 SAMPLED_BASE = Path("applications/gospel/sampled_circuits")
 ENT_ERRORS: list[float] = list(np.logspace(-6, -1, num=10))
-# Removing the two first
+# Removing the first couple of them
 ENT_ERRORS.pop(0)
 ENT_ERRORS.pop(0)
+ENT_ERRORS.pop(0)
+ENT_ERRORS.pop(0)
+ENT_ERRORS.pop(0)
+print(ENT_ERRORS)
 FOLDER_RE = re.compile(r"^circuits-(\d+)-(\d+)-(.+)$")
 
 
