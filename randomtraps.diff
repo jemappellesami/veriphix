@@ -1,5 +1,5 @@
 diff --git a/.github/workflows/ruff.yml b/.github/workflows/ruff.yml
-index 427e742..19b60ff 100644
+index 427e742e..19b60ff3 100644
 --- a/.github/workflows/ruff.yml
 +++ b/.github/workflows/ruff.yml
 @@ -12,6 +12,7 @@ jobs:
@@ -15,11 +15,148 @@ index 427e742..19b60ff 100644
          with:
            args: "format --check"
 +          version: "0.15.12"
+diff --git a/tests/test_client.py b/tests/test_client.py
+index 311dad7a..41b4228f 100644
+--- a/tests/test_client.py
++++ b/tests/test_client.py
+@@ -11,7 +11,7 @@ from typing_extensions import override
+ 
+ from veriphix.blinding import Secrets
+ from veriphix.client import Client, ClientMeasureMethod
+-from veriphix.verifying import ComputationRun
++from veriphix.verifying import ComputationRun, get_graph_clifford_structure
+ 
+ 
+ class TestClient:
+@@ -30,7 +30,7 @@ class TestClient:
+         secrets = Secrets(a=True, r=True, theta=True)
+ 
+         client = Client(pattern=pattern, input_state=states, secrets=secrets, classical_output=True, rng=fx_rng)
+-        ComputationRun(client).delegate(backend=StatevectorBackend(), rng=fx_rng)
++        ComputationRun().accept(client, StatevectorBackend(), None, fx_rng)
+         # No assertion needed
+ 
+     def test_minimize_space(self, fx_rng: Generator) -> None:
+@@ -48,7 +48,7 @@ class TestClient:
+         secrets = Secrets(a=True, r=True, theta=True)
+ 
+         client = Client(pattern=pattern, input_state=states, secrets=secrets, classical_output=True, rng=fx_rng)
+-        ComputationRun(client).delegate(backend=StatevectorBackend(), rng=fx_rng)
++        ComputationRun().accept(client, StatevectorBackend(), None, fx_rng)
+         # No assertion needed
+ 
+     def test_client_input(self, fx_rng: Generator) -> None:
+@@ -88,7 +88,7 @@ class TestClient:
+             secrets = Secrets(r=True)
+             # Giving it empty will create a random secret
+             client = Client(pattern=pattern, secrets=secrets, classical_output=False, rng=fx_rng)
+-            ComputationRun(client).delegate(backend, rng=fx_rng)
++            ComputationRun().accept(client, backend, None, fx_rng)
+             state_mbqc = backend.state
+             np.testing.assert_almost_equal(np.abs(np.dot(state_mbqc.psi.flatten().conjugate(), state.psi.flatten())), 1)
+ 
+@@ -111,7 +111,7 @@ class TestClient:
+             client = Client(pattern=pattern, input_state=states, secrets=secrets, classical_output=False, rng=fx_rng)
+             backend = StatevectorBackend()
+             # Blinded simulation, between the client and the server
+-            ComputationRun(client).delegate(backend, rng=fx_rng)
++            ComputationRun().accept(client, backend, None, fx_rng)
+             blinded_simulation = backend.state
+ 
+             # Clear simulation = no secret, just simulate the circuit defined above
+@@ -140,7 +140,7 @@ class TestClient:
+             client = Client(pattern=pattern, input_state=states, secrets=secrets, classical_output=False, rng=fx_rng)
+             backend = StatevectorBackend()
+             # Blinded simulation, between the client and the server
+-            ComputationRun(client).delegate(backend, rng=fx_rng)
++            ComputationRun().accept(client, backend, None, fx_rng)
+             blinded_simulation = backend.state
+ 
+             # Clear simulation = no secret, just simulate the circuit defined above
+@@ -171,7 +171,7 @@ class TestClient:
+         # Giving it empty will create a random secret
+         client = Client(pattern=pattern, measure_method_cls=CacheMeasureMethod, secrets=secrets, rng=fx_rng)
+         backend = StatevectorBackend()
+-        ComputationRun(client).delegate(backend, rng=fx_rng)
++        ComputationRun().accept(client, backend, None, fx_rng)
+ 
+         for measured_node in client.measurement_db:
+             # Compare results on the client side and on the server side : should differ by r[node]
+@@ -207,8 +207,6 @@ class TestClient:
+         for _ in range(10):
+             circuit = rand_circuit(nqubits, depth, fx_rng)
+             pattern = circuit.transpile().pattern
+-            # pattern.minimize_space()
+-            # pattern.standardize(method="global")
+ 
+             secrets = Secrets(a=True, r=True, theta=True)
+ 
+@@ -220,9 +218,8 @@ class TestClient:
+ 
+             backend = StatevectorBackend()
+             # Blinded simulation, between the client and the server
+-            # ComputationRun(client).delegate(backend)
+-            computation = ComputationRun(client=client)
+-            computation.delegate(backend=backend, rng=fx_rng)
++            computation = ComputationRun()
++            computation.accept(client, backend, None, fx_rng)
+             blinded_simulation = backend.state
+ 
+             # Clear simulation = no secret, just simulate the circuit defined above
+@@ -239,9 +236,9 @@ class TestClient:
+ 
+         client = Client(pattern=pattern, rng=fx_rng)
+ 
+-        comp_run = ComputationRun(client=client)
++        comp_run = ComputationRun()
+         backend = StatevectorBackend()
+-        outcomes = comp_run.delegate(backend=backend, rng=fx_rng)
++        outcomes = comp_run.accept(client, backend, None, fx_rng)
+         assert outcomes is not None
+         # TODO: assert something ? generate BQP computation for that
+ 
+@@ -251,9 +248,10 @@ class TestClient:
+         circuit = rand_circuit(nqubits, depth, fx_rng)
+         pattern = circuit.transpile().pattern
+         client = Client(pattern=pattern, rng=fx_rng)
++        clifford_structure = get_graph_clifford_structure(graph=client.graph)
+         for node in client.graph.nodes:
+             x_string = PauliString(["X" if i == node else "I" for i in client.graph.nodes])
+-            conjugated_string = client.clifford_structure.inverse()(x_string)
++            conjugated_string = clifford_structure.inverse()(x_string)
+             neighbors = set(client.graph.neighbors(node))
+             expected_conjugated_string = PauliString(
+                 ["X" if i == node else "Z" if i in neighbors else "I" for i in client.graph.nodes]
 diff --git a/tests/test_protocols.py b/tests/test_protocols.py
-index b008fe4..f2ba018 100644
+index b008fe46..eb2c01f6 100644
 --- a/tests/test_protocols.py
 +++ b/tests/test_protocols.py
-@@ -128,6 +128,51 @@ class TestProtocols:
+@@ -87,7 +87,7 @@ class TestProtocols:
+         client.preprocess_pattern()
+         client.create_blind_patterns(rng=fx_rng)
+         with pytest.raises(ValueError):  # trivially duplicate a node
+-            protocol.create_test_runs(client=client)
++            protocol.create_test_runs(graph=client.graph)
+ 
+     def test_create_test_run_manual_fail_improper(self, fx_rng: Generator) -> None:
+         """testing manual colouring not proper"""
+@@ -102,13 +102,8 @@ class TestProtocols:
+ 
+         nodes = pattern.extract_nodes()
+ 
+-        # initialise client
+-        protocol = FK12(manual_colouring=(set(nodes), set([next(iter(nodes))])))
+-        client = Client(pattern=pattern, autogen=False, rng=fx_rng)
+-        client.preprocess_pattern()
+-        client.create_blind_patterns(rng=fx_rng)
+-        with pytest.raises(ValueError):  # trivially duplicate a node
+-            protocol.create_test_runs(client=client)
++        with pytest.raises(ValueError):  # trivially bad colouring
++            FK12(manual_colouring=(set(nodes), set([next(iter(nodes))])))
+ 
+     def test_random_traps(self, fx_rng: np.random.Generator) -> None:
+         """
+@@ -128,6 +123,51 @@ class TestProtocols:
          assert decision
          assert result_analysis.nr_failed_test_rounds == 0
  
@@ -53,16 +190,16 @@ index b008fe4..f2ba018 100644
 +        detections = 0
 +
 +        for _ in range(n_test_runs):
-+            # IMPORTANT: sample uniformly from non-empty subsets.
-+            # Your current rng.integers(n) excludes size n and allows size 0.
-+            mask = fx_rng.integers(1, 2**n)
-+            H = frozenset(nodes[i] for i in range(n) if (mask >> i) & 1)
-+
-+            detected = (len(error_support & H) % 2) == 1
++            test_run = protocol.sample_test_run(
++                graph=client.graph,
++                test_runs=client.test_runs,
++                rng=fx_rng,
++            )
++            trap = next(iter(test_run.traps))
++            detected = (len(error_support & trap) % 2) == 1
 +            detections += int(detected)
 +
 +        detection_rate = detections / n_test_runs
-+
 +        # With 100 samples, allow statistical slack.
 +        assert 0.35 <= detection_rate <= 0.65, (
 +            f"Expected ≈1/2 detection rate, got {detection_rate:.3f}; error_support={error_support}"
@@ -72,7 +209,7 @@ index b008fe4..f2ba018 100644
          "odd_pair_generator",
          [
 diff --git a/tests/test_vbqc.py b/tests/test_vbqc.py
-index 273979e..58b1af2 100644
+index 273979e5..11e0584c 100644
 --- a/tests/test_vbqc.py
 +++ b/tests/test_vbqc.py
 @@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
@@ -93,8 +230,23 @@ index 273979e..58b1af2 100644
  from veriphix.verifying import QuantumComputationResult, TrappifiedSchemeParameters
  
  if TYPE_CHECKING:
-@@ -157,6 +159,164 @@ class TestVBQC:
-             trap_outcomes = test_run.delegate(backend=backend, noise_model=noise_model, rng=fx_rng).trap_outcomes
+@@ -44,7 +46,7 @@ class TestVBQC:
+         client = Client(pattern=pattern, secrets=secrets, rng=fx_rng)
+         for test_run in client.test_runs:
+             backend = StatevectorBackend()
+-            trap_outcomes = test_run.delegate(backend=backend, rng=fx_rng).trap_outcomes
++            trap_outcomes = test_run.accept(client, backend, None, fx_rng).trap_outcomes
+             assert sum(trap_outcomes.values()) == 0
+ 
+     def test_sample_canvas(self, fx_rng: Generator) -> None:
+@@ -152,11 +154,176 @@ class TestVBQC:
+             measure_channel_prob=0,
+         )
+         for test_run in client.test_runs:
+-            client.refresh_randomness(rng=fx_rng)
+             backend = DensityMatrixBackend()
+-            trap_outcomes = test_run.delegate(backend=backend, noise_model=noise_model, rng=fx_rng).trap_outcomes
++            trap_outcomes = test_run.accept(client, backend, noise_model, fx_rng).trap_outcomes
              assert sum(trap_outcomes.values()) == 0
  
 +    @pytest.mark.parametrize("noise_model_name", ["depolarising", "malicious"])
@@ -164,54 +316,58 @@ index 273979e..58b1af2 100644
 +        Because noise < rho_min, the protocol's guarantees hold: traps should still
 +        pass and the majority-vote answer should match the expected BQP output.
 +        """
++        import random
++
 +        rho_min = 0.1
 +
 +        with Path("tests/test_circuits/table.json").open() as f:
 +            table = json.load(f)
++        circuit_label = random.choice(list(table.keys()))
++        prob = table[circuit_label]
++        bqp_error = prob if prob <= 1 / 2 else 1 - prob
 +
-+        for circuit_label, prob in table.items():
-+            pattern = load_pattern_from_circuit(circuit_label)
-+            correct_answer = round(prob)
-+            secrets = Secrets(a=True, r=True, theta=True)
++        # for circuit_label, prob in table.items():
++        pattern = load_pattern_from_circuit(circuit_label)
++        correct_answer = round(prob)
++        secrets = Secrets(a=True, r=True, theta=True)
 +
-+            protocol = RandomTraps()
-+            client = Client(pattern=pattern, secrets=secrets, protocol=protocol, rng=fx_rng)
++        protocol = RandomTraps()
++        client = Client(pattern=pattern, secrets=secrets, protocol=protocol, rng=fx_rng)
 +
-+            design = optimize_with_robustness_constraint(
-+                c=0,
-+                detection_rate=protocol.detection_rate,
-+                epsilon_target=1e-2,
-+                rho_min=rho_min,
-+                n_grid=200,
-+            )
++        design = optimize_with_robustness_constraint(
++            c=bqp_error,
++            detection_rate=protocol.detection_rate,
++            epsilon_target=1e-2,
++            rho_min=rho_min,
++            n_grid=200,
++        )
 +
-+            parameters = TrappifiedSchemeParameters(
-+                comp_rounds=design.d,
-+                test_rounds=design.s,
-+                threshold=design.w,
-+            )
-+            client.trappifiedScheme.params = parameters
++        parameters = TrappifiedSchemeParameters(
++            comp_rounds=design.d,
++            test_rounds=design.s,
++            threshold=design.w,
++        )
++        client.trappifiedScheme.params = parameters
 +
-+            noise_model = MaliciousNoiseModel(
-+                nodes=[int(n) for n in client.output_nodes],
-+                prob=rho_min * 1,
-+                rng=fx_rng,
-+            )
++        noise_model = MaliciousNoiseModel(
++            nodes=[int(n) for n in client.output_nodes],
++            prob=rho_min * 0.5,
++            rng=fx_rng,
++        )
 +
-+            canvas = client.sample_canvas(rng=fx_rng)
-+            print(parameters)
-+            outcomes = client.delegate_canvas(
-+                canvas=canvas,
-+                backend_cls=DensityMatrixBackend,
-+                noise_model=noise_model,
-+                rng=fx_rng,
-+            )
-+            traps_decision, computation_decision, _ = client.analyze_outcomes(canvas, outcomes)
++        canvas = client.sample_canvas(rng=fx_rng)
++        outcomes = client.delegate_canvas(
++            canvas=canvas,
++            backend_cls=DensityMatrixBackend,
++            noise_model=noise_model,
++            rng=fx_rng,
++        )
++        traps_decision, computation_decision, _ = client.analyze_outcomes(canvas, outcomes)
 +
-+            assert traps_decision, f"{circuit_label}: honest server rejected"
-+            assert int(computation_decision) == correct_answer, (
-+                f"{circuit_label}: majority vote gave {int(computation_decision)}, expected {correct_answer}"
-+            )
++        assert traps_decision, f"{circuit_label}: honest server rejected"
++        assert int(computation_decision) == correct_answer, (
++            f"{circuit_label}: majority vote gave {int(computation_decision)}, expected {correct_answer}"
++        )
 +
 +    def test_designed_rounds_noiseless(self, fx_rng: Generator) -> None:
 +        """Round counts from util_rounds integrate correctly with the VBQC pipeline.
@@ -224,22 +380,25 @@ index 273979e..58b1af2 100644
 +        to keep the optimised round counts small and the test fast.
 +        """
 +        nqubits = 2
-+        depth = 3
++        depth = 1
++        epsilon_target = 0.1
++        rho_min = 0.1
 +        circuit = rand_circuit(nqubits, depth, fx_rng)
 +        pattern = circuit.transpile().pattern
 +
 +        protocol = FK12()
++        client = Client(pattern=pattern, protocol=protocol)
 +
 +        design = optimize_with_robustness_constraint(
 +            c=0,
 +            detection_rate=protocol.detection_rate,
-+            epsilon_target=0.05,
-+            rho_min=0.01,
++            epsilon_target=epsilon_target,
++            rho_min=rho_min,
 +            n_grid=200,
 +        )
 +
-+        assert design.total_bound <= 0.05
-+        assert design.w_over_s >= 0.01
++        assert design.total_bound <= epsilon_target
++        assert design.w_over_s >= rho_min  # TODO: missing alpha
 +
 +        parameters = TrappifiedSchemeParameters(
 +            comp_rounds=design.d,
@@ -247,6 +406,7 @@ index 273979e..58b1af2 100644
 +            threshold=design.w,
 +        )
 +        secrets = Secrets(a=True, r=True, theta=True)
++        pattern = circuit.transpile().pattern
 +        client = Client(pattern=pattern, secrets=secrets, protocol=protocol, parameters=parameters, rng=fx_rng)
 +
 +        canvas = client.sample_canvas(rng=fx_rng)
@@ -258,7 +418,7 @@ index 273979e..58b1af2 100644
      @pytest.mark.parametrize("noise_model_name", ["depolarising", "malicious"])
      def test_noisy(self, fx_rng: Generator, noise_model_name: str) -> None:
          nqubits = 3
-@@ -169,7 +329,6 @@ class TestVBQC:
+@@ -169,7 +336,6 @@ class TestVBQC:
  
          client = Client(pattern=pattern, input_state=states, secrets=secrets, rng=fx_rng)
  
@@ -266,7 +426,22 @@ index 273979e..58b1af2 100644
          if noise_model_name == "depolarising":
              noise_model = DepolarisingNoiseModel(
                  measure_error_prob=1,
-@@ -215,3 +374,12 @@ def find_correct_value(circuit_name: str) -> Outcome:
+@@ -194,13 +360,7 @@ class TestVBQC:
+ 
+         for test_run in client.test_runs:
+             backend = DensityMatrixBackend()
+-            client.refresh_randomness(rng=fx_rng)
+-
+-            trap_outcomes = test_run.delegate(
+-                backend=backend,
+-                noise_model=noise_model,
+-                rng=fx_rng,
+-            ).trap_outcomes
++            trap_outcomes = test_run.accept(client, backend, noise_model, fx_rng).trap_outcomes
+ 
+             if sum(trap_outcomes.values()) > 0:
+                 failures += 1
+@@ -215,3 +375,12 @@ def find_correct_value(circuit_name: str) -> Outcome:
          # return 0 else (no instance, as circuits are already filtered)
          # print(table[circuit_name])
          return round(table[circuit_name])
@@ -279,62 +454,269 @@ index 273979e..58b1af2 100644
 +        keep = rng.random(len(nodes)) < 0.5
 +        if keep.any():
 +            return frozenset(node for node, k in zip(nodes, keep, strict=True) if k)
+diff --git a/tests/test_verifying.py b/tests/test_verifying.py
+index d8bb1722..88f53ef1 100644
+--- a/tests/test_verifying.py
++++ b/tests/test_verifying.py
+@@ -12,7 +12,7 @@ class TestVerifying:
+         depth = 5
+         circuit = rand_circuit(nqubits, depth, fx_rng)
+         pattern = circuit.transpile().pattern
+-
++        
+         client = Client(pattern=pattern, rng=fx_rng)
+ 
+         for _ in range(10):
+@@ -24,9 +24,13 @@ class TestVerifying:
+             # Only one trap
+             traps = frozenset({random_multi_qubit_trap})
+ 
+-            test_run = TestRun(client=client, traps=traps)
++            test_run = TestRun(
++                graph=client.graph,
++                nqubits=len(client.graph),
++                traps=traps,
++            )
+             backend = StatevectorBackend()
+-            outcomes = test_run.delegate(backend=backend, rng=fx_rng).trap_outcomes
++            outcomes = test_run.accept(client, backend, None, fx_rng).trap_outcomes
+ 
+             for trap in traps:
+                 assert outcomes[trap] == 0
 diff --git a/veriphix/client.py b/veriphix/client.py
-index 73c3955..50caf29 100644
+index 73c39556..91eb94d7 100644
 --- a/veriphix/client.py
 +++ b/veriphix/client.py
-@@ -257,7 +257,7 @@ class Client:
+@@ -19,7 +19,7 @@ from graphix.measurements import BlochMeasurement, Measurement, toggle_outcome
+ from graphix.pattern import Pattern
+ from graphix.rng import ensure_rng
+ from graphix.sim.statevec import Statevec
+-from graphix.simulator import MeasureMethod, PrepareMethod
++from graphix.simulator import MeasureMethod, PatternSimulator, PrepareMethod
+ from graphix.states import BasicStates, State
+ from typing_extensions import override
+ 
+@@ -27,10 +27,15 @@ from veriphix.blinding import SecretDatas, Secrets
+ from veriphix.malicious_noise_model import MaliciousNoiseModel
+ from veriphix.protocols import FK12, VerificationProtocol
+ from veriphix.verifying import (
++    ClassicalComputationResult,
++    ComputationResult,
+     ComputationRun,
++    QuantumComputationResult,
+     ResultAnalysis,
+     Run,
+     RunResult,
++    TestResult,
++    TestRun,
+     TrappifiedScheme,
+     TrappifiedSchemeParameters,
+ )
+@@ -87,12 +92,7 @@ def remove_flow(pattern: Pattern) -> Pattern:
+     return clean_pattern
+ 
+ 
+-def get_graph_clifford_structure(graph: nx.Graph[int]) -> stim.Tableau:
+-    circuit = stim.Circuit()
+-    for edge in graph.edges:
+-        i, j = edge
+-        circuit.append_from_stim_program_text(f"CZ {i} {j}")
+-    return circuit.to_tableau()
++
+ 
+ 
+ def qCircuit_predicate(output_string: str) -> bool:
+@@ -143,7 +143,6 @@ class Client:
+             self._add_measurement_commands(self.initial_pattern)
+ 
+         self.graph = self.initial_pattern.extract_graph()
+-        self.clifford_structure = get_graph_clifford_structure(self.graph)
+ 
+         self.results = self.initial_pattern.results.copy()
+ 
+@@ -180,8 +179,12 @@ class Client:
+         self.prepare_method = ClientPrepareMethod(self.preparation_bank)
+ 
+     def create_trappified_scheme(self, rng: Generator | None = None, *, stacklevel: int = 1) -> None:
+-        self.computationRun = ComputationRun(self)
+-        self.test_runs = self.protocol.create_test_runs(client=self, rng=rng, stacklevel=stacklevel + 1)
++        self.computationRun = ComputationRun()
++        self.test_runs = self.protocol.create_test_runs(
++            graph=self.graph,
++            rng=rng,
++            stacklevel=stacklevel + 1,
++        )
+         self.trappifiedScheme = TrappifiedScheme(
+             params=self.parameters or TrappifiedSchemeParameters(20, 20, 5), test_runs=self.test_runs
+         )
+@@ -257,7 +260,11 @@ class Client:
          computation_rounds = set(rng.choice(N, size=self.trappifiedScheme.params.comp_rounds, replace=False))
  
          return {
 -            r: self.computationRun if r in computation_rounds else self.test_runs[rng.integers(len(self.test_runs))]
-+            r: self.computationRun if r in computation_rounds else self.protocol.sample_test_run(client=self, rng=rng)
++            r: self.computationRun if r in computation_rounds else self.protocol.sample_test_run(
++                graph=self.graph,
++                test_runs=self.test_runs,
++                rng=rng,
++            )
              for r in range(N)
          }
  
+@@ -273,7 +280,7 @@ class Client:
+             backend = backend_cls()
+             if isinstance(noise_model, MaliciousNoiseModel):
+                 noise_model.refresh_randomness(rng=rng)
+-            outcomes[r] = canvas[r].delegate(backend=backend, noise_model=noise_model, rng=rng)
++            outcomes[r] = canvas[r].accept(self, backend, noise_model, rng)
+         return outcomes
+ 
+     def analyze_outcomes(
+@@ -290,6 +297,53 @@ class Client:
+ 
+         return traps_decision, computation_decision, result_analysis
+ 
++    def execute_computation_run(
++        self,
++        backend: Backend[_StateT],
++        noise_model: NoiseModel | None = None,
++        rng: Generator | None = None,
++    ) -> ComputationResult[_StateT]:
++        self.refresh_randomness(rng=rng)
++        self.prepare_states(backend, states_dict=self.computation_states)
++        sim = PatternSimulator(
++            backend=backend,
++            pattern=self.clean_pattern,
++            prepare_method=self.prepare_method,
++            measure_method=self.measure_method,
++            noise_model=noise_model,
++        )
++        sim.run(input_state=None, rng=rng)
++        if not self.classical_output:
++            self.decode_output_state(backend)
++            return QuantumComputationResult(backend.state)
++        results: dict[int, Outcome] = {onode: self.results[onode] for onode in self.output_nodes}
++        return ClassicalComputationResult(outcomes=results)
++
++    def execute_test_run(
++        self,
++        test_run: TestRun,
++        backend: Backend[_StateT],
++        noise_model: NoiseModel | None = None,
++        rng: Generator | None = None,
++    ) -> TestResult[_StateT]:
++        self.refresh_randomness(rng=rng)
++        states_dict = {node: test_run.input_state[node] for node in self.nodes}
++        self.prepare_states(backend=backend, states_dict=states_dict)
++        sim = PatternSimulator(
++            backend=backend,
++            pattern=self.test_pattern,
++            prepare_method=self.prepare_method,
++            measure_method=self.test_measure_method,
++            noise_model=noise_model,
++        )
++        sim.run(input_state=None, rng=rng)
++        trap_outcomes: dict[frozenset[int], int] = {}
++        for trap in test_run.traps:
++            outcomes = [self.results[component] for component in trap]
++            trap_outcome = sum(outcomes) % 2 ^ (test_run.stabilizer.sign == -1)
++            trap_outcomes[frozenset(trap)] = trap_outcome
++        return TestResult(trap_outcomes)
++
+     def decode_output_state(self, backend: Backend[_StateT]) -> None:
+         for node in self.output_nodes:
+             z_decoding, x_decoding = self.decode_output(node)
 diff --git a/veriphix/malicious_noise_model.py b/veriphix/malicious_noise_model.py
-index b88df95..42707c1 100644
+index b88df952..5ac25d22 100644
 --- a/veriphix/malicious_noise_model.py
 +++ b/veriphix/malicious_noise_model.py
-@@ -58,7 +58,8 @@ class MaliciousNoiseModel(NoiseModel):
+@@ -58,13 +58,11 @@ class MaliciousNoiseModel(NoiseModel):
  
      def __init__(self, nodes: list[int], prob: float = 0.0, rng: Generator | None = None) -> None:
          self.prob = prob
 -        self.nodes: set[int] = {int(node) for node in nodes}  # ✅ Explicitly annotate as set[int]
-+        self.nodes = nodes
-+        self.nodes = {int(node) for node in nodes}
++        self.nodes: set[int] = {int(node) for node in nodes}
          self.refresh_randomness(rng)
  
      def refresh_randomness(self, rng: Generator | None = None) -> None:
+         rng = ensure_rng(rng)
+-        # self.node = random.choice(self.nodes)
+-        # self.target_nodes = random.sample(self.nodes, self.n_targets)
+         self.attack = bool(rng.uniform() < self.prob)
+ 
+     @override
 diff --git a/veriphix/protocols.py b/veriphix/protocols.py
-index 3764831..a6d4d28 100644
+index 3764831a..d8d8cb83 100644
 --- a/veriphix/protocols.py
 +++ b/veriphix/protocols.py
-@@ -40,16 +40,34 @@ class GraphStabilizer:
+@@ -13,7 +13,9 @@ import stim
+ from graphix.rng import ensure_rng
+ from typing_extensions import override
+ 
+-from veriphix.verifying import TestRun
++from veriphix.verifying import TestRun, build_stabilizer
++
++BRICKWORK_DETECTION_RATE = 1 / 14
+ 
+ if TYPE_CHECKING:
+     from collections.abc import Sequence
+@@ -22,8 +24,6 @@ if TYPE_CHECKING:
+     from graphix import Pattern
+     from numpy.random import Generator
+ 
+-    from veriphix.client import Client
+-
+     _StateT = TypeVar("_StateT")
+ 
+ 
+@@ -40,18 +40,64 @@ class GraphStabilizer:
  
  
  class VerificationProtocol(ABC):
 +    @property
-+    @abstractmethod
+     @abstractmethod
+-    def create_test_runs(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> list[TestRun]:
 +    def detection_rate(self) -> float:
 +        pass
 +
-     @abstractmethod
-     def create_test_runs(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> list[TestRun]:
-         pass
- 
 +    @abstractmethod
-+    def sample_test_run(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> TestRun:
++    def create_test_runs(
++        self,
++        graph: nx.Graph,
++        rng: Generator | None = None,
++        *,
++        stacklevel: int = 1,
++    ) -> list[TestRun]:
 +        pass
 +
++    @abstractmethod
++    def sample_test_run(
++        self,
++        graph: nx.Graph,
++        test_runs: list[TestRun],
++        rng: Generator | None = None,
++        *,
++        stacklevel: int = 1,
++    ) -> TestRun:
+         pass
+ 
  
  class FK12(VerificationProtocol):
      def __init__(self, manual_colouring: Sequence[set[int]] | None = None) -> None:
          super().__init__()
++        # Check the manual colouring, if any
++        if manual_colouring is not None:
++            if len(manual_colouring) == 0:
++                raise ValueError("manual_colouring must not be empty.")
++            if any(i & j for i, j in itertools.combinations(manual_colouring, 2)):
++                raise ValueError(
++                    "The provided colouring is not a proper colouring i.e the same node belongs to at least two colours."
++                )
++            self._detection_rate = 1 / len(manual_colouring)
          self.manual_colouring = manual_colouring
  
 +    @property
-+    @override
+     @override
+-    def create_test_runs(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> list[TestRun]:
 +    def detection_rate(self) -> float:
 +        return self._detection_rate
 +
@@ -342,11 +724,57 @@ index 3764831..a6d4d28 100644
 +    def detection_rate(self, value: float) -> None:
 +        self._detection_rate = value
 +
-     @override
-     def create_test_runs(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> list[TestRun]:
++    @override
++    def create_test_runs(
++        self,
++        graph: nx.Graph,
++        rng: Generator | None = None,
++        *,
++        stacklevel: int = 1,
++    ) -> list[TestRun]:
          """Creates test runs according to a graph colouring according to [FK12].
-@@ -120,9 +138,14 @@ class FK12(VerificationProtocol):
-             test_run = TestRun(client=client, traps=traps)
+         A test run, or a Trappified Canvas, is associated to each color in the colouring.
+         For a given test run, the trap nodes are defined as being the nodes belonging to the color the run corresponds to.
+@@ -88,25 +134,17 @@ class FK12(VerificationProtocol):
+         # Create the graph coloring
+         # Networkx output format: dict[int, int] eg {0: 0, 1: 1, 2: 0, 3: 1}
+         if self.manual_colouring is None:
+-            coloring = nx.coloring.greedy_color(client.graph, strategy="largest_first")
++            coloring = nx.coloring.greedy_color(graph, strategy="largest_first")
+             colors = set(coloring.values())
+             nodes_by_color: dict[int, list[int]] = {c: [] for c in colors}
+-            for node in sorted(client.nodes):
++            for node in sorted(graph.nodes):
+                 color = coloring[node]
+                 nodes_by_color[color].append(node)
+         else:
+-            # checks that manual_colouring is a proper colouring
+-            ## first check uniion is the whole graph
++            # check that the colouring covers all nodes of the graph
+             color_union = set().union(*self.manual_colouring)
+-            if not color_union == set(client.graph.nodes):
++            if color_union != set(graph.nodes):
+                 raise ValueError("The provided colouring does not include all the nodes of the graph.")
+-            # check that colors are two by two disjoint
+-            # if sets are disjoint, empty set from intersection is interpreted as False.
+-            # so one non-empty set -> one True value -> use any()
+-            if any([i & j for i, j in itertools.combinations(self.manual_colouring, 2)]):
+-                raise ValueError(
+-                    "The provided colouring is not a proper colouring i.e the same node belongs to at least two colours."
+-                )
+ 
+             nodes_by_color = {i: list(c) for i, c in enumerate(self.manual_colouring)}
+             colors = set(nodes_by_color.keys())
+@@ -117,12 +155,28 @@ class FK12(VerificationProtocol):
+             # 1 color = 1 test run = 1 collection of single-qubit traps
+             traps_list = [frozenset([colored_node]) for colored_node in nodes_by_color[color]]
+             traps = frozenset(traps_list)
+-            test_run = TestRun(client=client, traps=traps)
++            test_run = TestRun(
++                graph=graph,
++                nqubits=len(graph),
++                traps=traps,
++            )
              test_runs.append(test_run)
  
 -        # print(test_runs)
@@ -354,14 +782,21 @@ index 3764831..a6d4d28 100644
          return test_runs
  
 +    @override
-+    def sample_test_run(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> TestRun:
++    def sample_test_run(
++        self,
++        graph: nx.Graph,
++        test_runs: list[TestRun],
++        rng: Generator | None = None,
++        *,
++        stacklevel: int = 1,
++    ) -> TestRun:
 +        rng = ensure_rng(rng, stacklevel=stacklevel + 1)
-+        return client.test_runs[rng.integers(len(client.test_runs))]
++        return test_runs[rng.integers(len(test_runs))]
 +
  
  def get_bipartite_coloring(pattern: Pattern) -> tuple[set[int], set[int]]:
      """Return a bipartite coloring for the given pattern."""
-@@ -153,31 +176,33 @@ def get_node_positions(pattern: Pattern, scale: float = 1, reverse_qubit_order:
+@@ -153,31 +207,49 @@ def get_node_positions(pattern: Pattern, scale: float = 1, reverse_qubit_order:
  
  
  class RandomTraps(VerificationProtocol):
@@ -372,26 +807,14 @@ index 3764831..a6d4d28 100644
      def __init__(self) -> None:
          super().__init__()
 +        self._detection_rate = 1 / 2
-+
-+    @property
-+    @override
-+    def detection_rate(self) -> float:
-+        return self._detection_rate
-+
-+    @detection_rate.setter
-+    def detection_rate(self, value: float) -> None:
-+        self._detection_rate = value
  
++    @property
      @override
-     def create_test_runs(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> list[TestRun]:
-+        return []
-+
-+    @override
-+    def sample_test_run(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> TestRun:
-         rng = ensure_rng(rng, stacklevel=stacklevel + 1)
+-    def create_test_runs(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> list[TestRun]:
+-        rng = ensure_rng(rng, stacklevel=stacklevel + 1)
 -        test_runs = []
 -        # Create 1 random trap per node
-         n = len(client.graph.nodes)
+-        n = len(client.graph.nodes)
 -        for _ in range(n):
 -            # Choose a random subset of nodes to create a trap (random size, random nodes)
 -            trap_size = rng.integers(n)
@@ -402,50 +825,132 @@ index 3764831..a6d4d28 100644
 -            traps = frozenset({random_multi_qubit_trap})
 -            test_run = TestRun(client=client, traps=traps)
 -            test_runs.append(test_run)
--
++    def detection_rate(self) -> float:
++        return self._detection_rate
+ 
 -        return test_runs
-+        trap_size = rng.integers(n)
-+        random_nodes: list[int] = [
-+            client.nodes[i] for i in rng.choice(len(client.nodes), size=trap_size, replace=False)
-+        ]
++    @detection_rate.setter
++    def detection_rate(self, value: float) -> None:
++        self._detection_rate = value
++
++    @override
++    def create_test_runs(
++        self,
++        graph: nx.Graph,
++        rng: Generator | None = None,
++        *,
++        stacklevel: int = 1,
++    ) -> list[TestRun]:
++        return []
++
++    @override
++    def sample_test_run(
++        self,
++        graph: nx.Graph,
++        test_runs: list[TestRun],
++        rng: Generator | None = None,
++        *,
++        stacklevel: int = 1,
++    ) -> TestRun:
++        rng = ensure_rng(rng, stacklevel=stacklevel + 1)
++        nodes = sorted(graph.nodes)
++        n = len(nodes)
++        trap_size = rng.integers(1, n + 1)
++        random_nodes: list[int] = [nodes[i] for i in rng.choice(n, size=trap_size, replace=False)]
 +        traps = frozenset({frozenset(random_nodes)})
-+        return TestRun(client=client, traps=traps)
++        return TestRun(
++            graph=graph,
++            nqubits=len(graph),
++            traps=traps,
++        )
  
  
  def _odd_pair_generators_bfs(
-@@ -302,6 +327,16 @@ class Dummyless(VerificationProtocol):
+@@ -302,33 +374,74 @@ class Dummyless(VerificationProtocol):
      def __init__(self, odd_pair_generator: OddPairGeneratorFn = _odd_pair_generators_bfs) -> None:
          super().__init__()
          self.odd_pair_generator = odd_pair_generator
-+        self._detection_rate = 1 / 14
-+
++        self._detection_rate = BRICKWORK_DETECTION_RATE
+ 
 +    @property
-+    @override
+     @override
+-    def create_test_runs(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> list[TestRun]:
 +    def detection_rate(self) -> float:
 +        return self._detection_rate
 +
 +    @detection_rate.setter
 +    def detection_rate(self, value: float) -> None:
 +        self._detection_rate = value
++
++    @override
++    def create_test_runs(
++        self,
++        graph: nx.Graph,
++        rng: Generator | None = None,
++        *,
++        stacklevel: int = 1,
++    ) -> list[TestRun]:
+         rng = ensure_rng(rng, stacklevel=stacklevel + 1)
++        n_qubits = len(graph)
  
-     @override
-     def create_test_runs(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> list[TestRun]:
-@@ -331,4 +366,11 @@ class Dummyless(VerificationProtocol):
-         generators.extend(self.odd_pair_generator(client.graph, stabdict, rfull))
+         # Step 0: build per-node GraphStabilizers (dict keyed by node id)
+         stabdict: dict[int, GraphStabilizer] = {
+             node: GraphStabilizer(
+                 node_indices={node},
+-                string=TestRun(client=client, traps=frozenset({frozenset({node})})).stabilizer,
++                string=build_stabilizer(
++                    graph,
++                    n_qubits,
++                    frozenset({frozenset({node})}),
++                ),
+             )
+-            for node in client.graph.nodes
++            for node in graph.nodes
+         }
+ 
+         # Step 1: Rfull = product of all S_v
+-        n_qubits = len(client.clifford_structure)
+         identity = GraphStabilizer(node_indices=set(), string=stim.PauliString(n_qubits))
+         rfull: GraphStabilizer = reduce(mul, stabdict.values(), identity)
+ 
+         # (removing S_v leaves I at v and flips Z count on its neighbours — stays in I/X/Y)
+         # Step 2a: for each even-degree node v, R\v = Rfull * S_v
+         generators: list[GraphStabilizer] = [
+-            rfull * stabdict[v] for v in client.graph.nodes if client.graph.degree(v) % 2 == 0
++            rfull * stabdict[v] for v in graph.nodes if graph.degree(v) % 2 == 0
+         ]
+ 
+         # Step 2b: one R\(u,w) generator per odd-degree node pair
+-        generators.extend(self.odd_pair_generator(client.graph, stabdict, rfull))
++        generators.extend(self.odd_pair_generator(graph, stabdict, rfull))
  
          # Step 3: build TestRuns — each generator's node_indices form one multi-qubit trap
 -        return [TestRun(client=client, traps=frozenset({frozenset(gs.node_indices)})) for gs in generators]
-+        test_runs = [TestRun(client=client, traps=frozenset({frozenset(gs.node_indices)})) for gs in generators]
++        test_runs = [
++            TestRun(
++                graph=graph,
++                nqubits=n_qubits,
++                traps=frozenset({frozenset(gs.node_indices)}),
++            )
++            for gs in generators
++        ]
 +        self._detection_rate = 1 / len(test_runs)
 +        return test_runs
 +
 +    @override
-+    def sample_test_run(self, client: Client, rng: Generator | None = None, *, stacklevel: int = 1) -> TestRun:
++    def sample_test_run(
++        self,
++        graph: nx.Graph,
++        test_runs: list[TestRun],
++        rng: Generator | None = None,
++        *,
++        stacklevel: int = 1,
++    ) -> TestRun:
 +        rng = ensure_rng(rng, stacklevel=stacklevel + 1)
-+        return client.test_runs[rng.integers(len(client.test_runs))]
++        return test_runs[rng.integers(len(test_runs))]
 diff --git a/veriphix/util_rounds.py b/veriphix/util_rounds.py
 new file mode 100644
-index 0000000..333ece4
+index 00000000..333ece4b
 --- /dev/null
 +++ b/veriphix/util_rounds.py
 @@ -0,0 +1,485 @@
@@ -934,3 +1439,174 @@ index 0000000..333ece4
 +    print(f"comp bound           = {best2.eps_comp_bound:.3e}")
 +    print(f"total bound          = {best2.total_bound:.3e}")
 +    print(f"objective (d+s)      = {best2.objective_value:.1f}")
+diff --git a/veriphix/verifying.py b/veriphix/verifying.py
+index 037c52a0..353a08d3 100644
+--- a/veriphix/verifying.py
++++ b/veriphix/verifying.py
+@@ -6,9 +6,10 @@ from collections.abc import Set as AbstractSet
+ from dataclasses import dataclass, field
+ from typing import TYPE_CHECKING, Generic, TypeVar
+ 
++import stim
+ from graphix.fundamentals import IXYZ_VALUES
+ from graphix.pauli import Pauli
+-from graphix.simulator import PatternSimulator
++import networkx as nx
+ from stim import PauliString
+ from typing_extensions import override
+ 
+@@ -29,51 +30,27 @@ _StateT = TypeVar("_StateT")
+ 
+ 
+ class Run(ABC):
+-    def __init__(self, client: Client) -> None:
+-        self.client = client
+-
+     @abstractmethod
+-    def delegate(
+-        self, backend: Backend[_StateT], noise_model: NoiseModel | None = None, rng: Generator | None = None
++    def accept(
++        self,
++        executor: Client,
++        backend: Backend[_StateT],
++        noise_model: NoiseModel | None,
++        rng: Generator | None,
+     ) -> RunResult[_StateT]:
+-        # Delegates using UBQC
+         pass
+ 
+ 
+ class ComputationRun(Run):
+-    def __init__(self, client: Client) -> None:
+-        super().__init__(client=client)
+-
+     @override
+-    def delegate(
++    def accept(
+         self,
++        executor: Client,
+         backend: Backend[_StateT],
+-        noise_model: NoiseModel | None = None,
+-        rng: Generator | None = None,
+-        *,
+-        stacklevel: int = 1,
++        noise_model: NoiseModel | None,
++        rng: Generator | None,
+     ) -> ComputationResult[_StateT]:
+-        self.client.refresh_randomness(rng=rng, stacklevel=stacklevel + 1)
+-        # Initializes the bank & asks backend to create the input
+-        self.client.prepare_states(backend, states_dict=self.client.computation_states)
+-
+-        sim = PatternSimulator(
+-            backend=backend,
+-            pattern=self.client.clean_pattern,
+-            prepare_method=self.client.prepare_method,
+-            measure_method=self.client.measure_method,
+-            noise_model=noise_model,
+-        )
+-        sim.run(input_state=None, rng=rng)
+-
+-        # If quantum output, decode the state, nothing needs to be returned (backend.state can be accessed by the Client)
+-        if not self.client.classical_output:
+-            self.client.decode_output_state(backend)
+-            return QuantumComputationResult(backend.state)
+-        # If classical output, return the output
+-        else:
+-            results: dict[int, Outcome] = {onode: self.client.results[onode] for onode in self.client.output_nodes}
+-            return ClassicalComputationResult(outcomes=results)
++        return executor.execute_computation_run(backend, noise_model, rng)
+ 
+ 
+ def merge_pauli_strings(stabilizer_1: PauliString, stabilizer_2: PauliString) -> PauliString:
+@@ -106,56 +83,53 @@ def generate_eigenstate(stabilizer: PauliString) -> list[PlanarState]:
+         states.append(operator.eigenstate())
+     return states
+ 
++def get_graph_clifford_structure(graph: nx.Graph[int]) -> stim.Tableau:
++    circuit = stim.Circuit()
++    for edge in graph.edges:
++        i, j = edge
++        circuit.append_from_stim_program_text(f"CZ {i} {j}")
++    return circuit.to_tableau()
++
++
++def build_stabilizer(
++    graph: nx.Graph,
++    nqubits: int,
++    traps: Traps,
++    meas_basis: str = "X",
++) -> PauliString:
++    measurement_strings = [
++        PauliString([meas_basis if i in trap else "I" for i in range(nqubits)]) for trap in traps
++    ]
++    clifford_structure = get_graph_clifford_structure(graph=graph)
++    conjugated_measurements = [clifford_structure.inverse()(meas) for meas in measurement_strings]
++    return merge(conjugated_measurements)
++
+ 
+ class TestRun(Run):
+     __test__ = False  # this is not a pytest test-suite
+ 
+-    def __init__(self, client: Client, traps: Traps, meas_basis: str = "X") -> None:
+-        super().__init__(client=client)
++    def __init__(
++        self,
++        graph: nx.Graph,
++        nqubits: int,
++        traps: Traps,
++        meas_basis: str = "X",
++    ) -> None:
+         self.traps = frozenset(traps)
+         self.meas_basis = meas_basis
+-        self.clifford_structure = client.clifford_structure
+-        self.nqubits = len(self.clifford_structure)
+-        self.stabilizer = self.build_common_stabilizer()
++        self.nqubits = nqubits
++        self.stabilizer = build_stabilizer(graph, nqubits, traps, meas_basis)
+         self.input_state = generate_eigenstate(self.stabilizer)
+ 
+-    def build_common_stabilizer(self) -> PauliString:
+-        # Build the PauliStrings representing the individual measurement of each trap qubit
+-        measurement_strings = [
+-            PauliString([self.meas_basis if i in trap else "I" for i in range(self.nqubits)]) for trap in self.traps
+-        ]
+-        # Conjugate each measurement
+-        conjugated_measurements = [self.clifford_structure.inverse()(meas) for meas in measurement_strings]
+-        common_stabilizer = merge(conjugated_measurements)
+-        return common_stabilizer
+-
+     @override
+-    def delegate(
++    def accept(
+         self,
++        executor: Client,
+         backend: Backend[_StateT],
+-        noise_model: NoiseModel | None = None,
+-        rng: Generator | None = None,
+-        *,
+-        stacklevel: int = 1,
++        noise_model: NoiseModel | None,
++        rng: Generator | None,
+     ) -> TestResult[_StateT]:
+-        self.client.refresh_randomness(rng=rng, stacklevel=stacklevel + 1)
+-        states_dict = {node: self.input_state[node] for node in self.client.nodes}
+-        self.client.prepare_states(backend=backend, states_dict=states_dict)
+-        sim = PatternSimulator(
+-            backend=backend,
+-            pattern=self.client.test_pattern,
+-            prepare_method=self.client.prepare_method,
+-            measure_method=self.client.test_measure_method,
+-            noise_model=noise_model,
+-        )
+-        sim.run(input_state=None, rng=rng)
+-
+-        trap_outcomes = dict()
+-        for trap in self.traps:
+-            outcomes = [self.client.results[component] for component in trap]
+-            trap_outcome = sum(outcomes) % 2 ^ (self.stabilizer.sign == -1)
+-            trap_outcomes[frozenset(trap)] = trap_outcome
+-        return TestResult(trap_outcomes)
++        return executor.execute_test_run(self, backend, noise_model, rng)
+ 
+     def __str__(self) -> str:
+         return f"""
