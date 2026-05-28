@@ -1,0 +1,6 @@
+==========================================
+SLURM_JOB_ID = 4918708
+SLURM_JOB_NODELIST = node037
+==========================================
+[15] circuit143.qasm  p_ent=1.0e-01  rounds=100
+[15] done in 2m07s → applications/gospel/hotgate/results/p0.1/circuit_015.csv
