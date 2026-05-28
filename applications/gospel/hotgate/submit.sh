@@ -23,8 +23,10 @@
 # or with conda:
 #   conda activate veriphix
 
-# ── parameters — mirror what you pass to simulate.py ─────────────────────────
-CIRCUITS_DIR="applications/gospel/circuits/circuits-3-6"
+# ── parameters ────────────────────────────────────────────────────────────────
+N_QUBITS=3
+DEPTH=6
+BQP_ERROR="1e-1"
 N_TEST_ROUNDS=100
 P_ENT=2e-3
 BASE_SEED=42
@@ -34,9 +36,11 @@ OUT_DIR="applications/gospel/hotgate/results"
 mkdir -p applications/gospel/hotgate/logs
 
 python applications/gospel/hotgate/simulate.py \
-    --circuit-idx    "$SLURM_ARRAY_TASK_ID" \
-    --circuits-dir   "$CIRCUITS_DIR" \
-    --n-test-rounds  "$N_TEST_ROUNDS" \
-    --p-ent          "$P_ENT" \
-    --base-seed      "$BASE_SEED" \
-    --out-dir        "$OUT_DIR"
+    --circuit-idx   "$SLURM_ARRAY_TASK_ID" \
+    --n-qubits      "$N_QUBITS" \
+    --depth         "$DEPTH" \
+    --bqp-error     "$BQP_ERROR" \
+    --n-test-rounds "$N_TEST_ROUNDS" \
+    --p-ent         "$P_ENT" \
+    --base-seed     "$BASE_SEED" \
+    --out-dir       "$OUT_DIR"

@@ -63,14 +63,20 @@ def _load_graph_and_positions(circuits_dir: Path):
     return client.graph, node_positions
 
 
+SAMPLED_BASE = Path("applications/gospel/sampled_circuits")
+
+
 @app.command()
 def main(
-    results_dir:   Annotated[Path,  typer.Option(help="Directory with per-circuit CSV files")] = Path("applications/gospel/hotgate/results"),
-    circuits_dir:  Annotated[Path,  typer.Option(help="Directory with .qasm circuits (for graph edges)")] = Path("applications/gospel/circuits/circuits-3-6"),
-    out:           Annotated[Path,  typer.Option(help="Output PDF path")] = Path("applications/gospel/hotgate/heatmap.pdf"),
-    p_ent:         Annotated[float, typer.Option(help="Noise level label for the plot title")] = 2e-3,
-    n_test_rounds: Annotated[int,   typer.Option(help="Test rounds label for the plot title")] = 100,
+    n_qubits:      Annotated[int,   typer.Option(help="Number of qubits")]                           = 3,
+    depth:         Annotated[int,   typer.Option(help="Circuit depth")]                              = 6,
+    bqp_error:     Annotated[str,   typer.Option(help="BQP error tag (folder suffix, e.g. 1e-1)")]  = "1e-1",
+    results_dir:   Annotated[Path,  typer.Option(help="Directory with per-circuit CSV files")]       = Path("applications/gospel/hotgate/results"),
+    out:           Annotated[Path,  typer.Option(help="Output PDF path")]                            = Path("applications/gospel/hotgate/heatmap.pdf"),
+    p_ent:         Annotated[float, typer.Option(help="Noise level label for the plot title")]       = 2e-3,
+    n_test_rounds: Annotated[int,   typer.Option(help="Test rounds label for the plot title")]       = 100,
 ) -> None:
+    circuits_dir = SAMPLED_BASE / f"circuits-{n_qubits}-{depth}-{bqp_error}"
     csv_files = sorted(results_dir.glob("circuit_*.csv"))
     if not csv_files:
         typer.echo(f"[ERROR] No circuit_*.csv files found in {results_dir}")

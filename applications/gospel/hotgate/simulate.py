@@ -8,7 +8,7 @@ Usage
 -----
     python applications/gospel/hotgate/simulate.py --circuit-idx 0
     python applications/gospel/hotgate/simulate.py --circuit-idx $SLURM_ARRAY_TASK_ID \\
-        --circuits-dir applications/gospel/circuits/circuits-3-6 \\
+        --n-qubits 6 --depth 6 --bqp-error 1e-1 \\
         --n-test-rounds 100 --p-ent 2e-3 --out-dir applications/gospel/hotgate/results
 """
 from __future__ import annotations
@@ -43,15 +43,25 @@ def _load_pattern(path: Path):
     return pattern
 
 
+SAMPLED_BASE = Path("applications/gospel/sampled_circuits")
+
+
 @app.command()
 def main(
-    circuit_idx: Annotated[int,  typer.Option(help="Index of the circuit to process (0-based)")] = 0,
-    circuits_dir: Annotated[Path, typer.Option(help="Directory containing .qasm circuit files")] = Path("applications/gospel/sampled_circuits/circuits-6-6-1e-1"),
-    n_test_rounds: Annotated[int,  typer.Option(help="Number of test rounds per circuit")]          = 100,
-    p_ent: Annotated[float, typer.Option(help="Depolarising entanglement error probability")]  = 2e-3,
-    base_seed: Annotated[int,  typer.Option(help="Base RNG seed (actual seed = base_seed + circuit_idx)")] = 42,
-    out_dir: Annotated[Path, typer.Option(help="Directory for per-circuit CSV output")]         = Path("applications/gospel/hotgate/results"),
+    circuit_idx:   Annotated[int,   typer.Option(help="Index of the circuit to process (0-based)")] = 0,
+    n_qubits:      Annotated[int,   typer.Option(help="Number of qubits")]                           = 3,
+    depth:         Annotated[int,   typer.Option(help="Circuit depth")]                              = 6,
+    bqp_error:     Annotated[str,   typer.Option(help="BQP error tag (folder suffix, e.g. 1e-1)")]  = "1e-1",
+    n_test_rounds: Annotated[int,   typer.Option(help="Number of test rounds per circuit")]          = 100,
+    p_ent:         Annotated[float, typer.Option(help="Depolarising entanglement error probability")] = 2e-3,
+    base_seed:     Annotated[int,   typer.Option(help="Base RNG seed (actual seed = base_seed + circuit_idx)")] = 42,
+    out_dir:       Annotated[Path,  typer.Option(help="Directory for per-circuit CSV output")]       = Path("applications/gospel/hotgate/results"),
 ) -> None:
+    circuits_dir = SAMPLED_BASE / f"circuits-{n_qubits}-{depth}-{bqp_error}"
+    if not circuits_dir.exists():
+        typer.echo(f"[ERROR] circuits directory not found: {circuits_dir}")
+        raise typer.Exit(1)
+
     circuit_files = sorted(circuits_dir.glob("*.qasm"))
     if circuit_idx >= len(circuit_files):
         typer.echo(f"[ERROR] circuit_idx={circuit_idx} out of range (only {len(circuit_files)} circuits)")
