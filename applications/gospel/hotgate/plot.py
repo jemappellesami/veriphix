@@ -71,15 +71,18 @@ def main(
     n_qubits:      Annotated[int,            typer.Option(help="Number of qubits")]                          = 3,
     depth:         Annotated[int,            typer.Option(help="Circuit depth")]                             = 6,
     bqp_error:     Annotated[str,            typer.Option(help="BQP error tag (folder suffix, e.g. 1e-1)")] = "1e-1",
-    results_dir:   Annotated[Path | None,    typer.Option(help="Directory with per-circuit CSV files (default: results/p{p_ent})")] = None,
-    out:           Annotated[Path | None,    typer.Option(help="Output PDF path (default: hotgate/heatmap_p{p_ent}.pdf)")]          = None,
-    p_ent:         Annotated[float,          typer.Option(help="Noise level")]                               = 2e-3,
-    n_test_rounds: Annotated[int,            typer.Option(help="Test rounds label for the plot title")]      = 100,
+    noise_model:    Annotated[str,           typer.Option(help="Noise model: depolarising or malicious")]    = "depolarising",
+    p_ent:          Annotated[float,         typer.Option(help="Depolarising noise level")]                   = 2e-3,
+    malicious_prob: Annotated[float,         typer.Option(help="Malicious attack probability")]               = 0.3,
+    results_dir:    Annotated[Path | None,   typer.Option(help="Directory with per-circuit CSV files")]       = None,
+    out:            Annotated[Path | None,   typer.Option(help="Output PDF path")]                            = None,
+    n_test_rounds:  Annotated[int,           typer.Option(help="Test rounds label for the plot title")]       = 100,
 ) -> None:
+    prob = malicious_prob if noise_model == "malicious" else p_ent
     if results_dir is None:
-        results_dir = Path(f"applications/gospel/hotgate/results/p{p_ent}")
+        results_dir = Path(f"applications/gospel/hotgate/results/{noise_model}_p{prob}")
     if out is None:
-        out = Path(f"applications/gospel/hotgate/heatmap_p{p_ent}.pdf")
+        out = Path(f"applications/gospel/hotgate/plots/{noise_model}/heatmap_p{prob}.pdf")
 
     circuits_dir = SAMPLED_BASE / f"circuits-{n_qubits}-{depth}-{bqp_error}"
     csv_files = sorted(results_dir.glob("circuit_*.csv"))
@@ -146,12 +149,15 @@ def main(
     ax.set_aspect("equal")
     ax.axis("off")
 
-    n_qubits = len(set(r for _, r in node_positions.values()))
-    n_depth  = n_cols
+    n_qubits_plot = len(set(r for _, r in node_positions.values()))
+    if noise_model == "malicious":
+        noise_label = f"malicious, $p_{{\\mathrm{{att}}}}$={malicious_prob}"
+    else:
+        noise_label = f"depolarising, $p_{{\\mathrm{{ent}}}}$={p_ent:.0e}"
     ax.set_title(
         f"FK12 trap failure rate  "
-        f"(n={n_qubits}, d={n_depth}, {n_circuits} circuits × {n_test_rounds} rounds, "
-        f"$p_{{\\mathrm{{ent}}}}$={p_ent:.0e})",
+        f"(n={n_qubits_plot}, d={n_cols}, {n_circuits} circuits × {n_test_rounds} rounds, "
+        f"{noise_label})",
         pad=10,
     )
 
