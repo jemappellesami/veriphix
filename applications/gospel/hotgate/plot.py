@@ -68,14 +68,19 @@ SAMPLED_BASE = Path("applications/gospel/sampled_circuits")
 
 @app.command()
 def main(
-    n_qubits:      Annotated[int,   typer.Option(help="Number of qubits")]                           = 3,
-    depth:         Annotated[int,   typer.Option(help="Circuit depth")]                              = 6,
-    bqp_error:     Annotated[str,   typer.Option(help="BQP error tag (folder suffix, e.g. 1e-1)")]  = "1e-1",
-    results_dir:   Annotated[Path,  typer.Option(help="Directory with per-circuit CSV files")]       = Path("applications/gospel/hotgate/results"),
-    out:           Annotated[Path,  typer.Option(help="Output PDF path")]                            = Path("applications/gospel/hotgate/heatmap.pdf"),
-    p_ent:         Annotated[float, typer.Option(help="Noise level label for the plot title")]       = 2e-3,
-    n_test_rounds: Annotated[int,   typer.Option(help="Test rounds label for the plot title")]       = 100,
+    n_qubits:      Annotated[int,            typer.Option(help="Number of qubits")]                          = 3,
+    depth:         Annotated[int,            typer.Option(help="Circuit depth")]                             = 6,
+    bqp_error:     Annotated[str,            typer.Option(help="BQP error tag (folder suffix, e.g. 1e-1)")] = "1e-1",
+    results_dir:   Annotated[Path | None,    typer.Option(help="Directory with per-circuit CSV files (default: results/p{p_ent})")] = None,
+    out:           Annotated[Path | None,    typer.Option(help="Output PDF path (default: hotgate/heatmap_p{p_ent}.pdf)")]          = None,
+    p_ent:         Annotated[float,          typer.Option(help="Noise level")]                               = 2e-3,
+    n_test_rounds: Annotated[int,            typer.Option(help="Test rounds label for the plot title")]      = 100,
 ) -> None:
+    if results_dir is None:
+        results_dir = Path(f"applications/gospel/hotgate/results/p{p_ent}")
+    if out is None:
+        out = Path(f"applications/gospel/hotgate/heatmap_p{p_ent}.pdf")
+
     circuits_dir = SAMPLED_BASE / f"circuits-{n_qubits}-{depth}-{bqp_error}"
     csv_files = sorted(results_dir.glob("circuit_*.csv"))
     if not csv_files:
@@ -118,8 +123,8 @@ def main(
     # Plot.
     fig, ax = plt.subplots(figsize=(max(8, n_cols * 0.6), max(5, n_rows * 1.2)))
 
-    cmap   = plt.colormaps["jet"]
-    norm   = Normalize(vmin=0.0, vmax=1.0)
+    cmap   = plt.colormaps["YlOrRd"]
+    norm   = Normalize(vmin=0.0, vmax=float(np.percentile(rate_grid, 95)))
     radius = 0.38
 
     for u, v in graph.edges():
