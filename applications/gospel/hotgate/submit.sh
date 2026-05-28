@@ -24,11 +24,11 @@
 #   conda activate veriphix
 
 # ── parameters ────────────────────────────────────────────────────────────────
-N_QUBITS=3
-DEPTH=6
+N_QUBITS=5
+DEPTH=5
 BQP_ERROR="1e-1"
 N_TEST_ROUNDS=100
-P_ENT=2e-3
+P_ENT=0.1
 BASE_SEED=42
 OUT_DIR="applications/gospel/hotgate/results"
 
