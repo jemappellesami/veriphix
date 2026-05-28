@@ -20,8 +20,8 @@ from pathlib import Path
 
 CIRCUITS_BASE = Path("applications/gospel/circuits")
 
-NQUBITS_RANGE = range(3, 6)
-DEPTH_RANGE   = range(5, 8)
+NQUBITS_RANGE = [3]
+DEPTH_RANGE   = [8]
 
 NCIRCUITS  = 1000
 P_GATE     = 0.5

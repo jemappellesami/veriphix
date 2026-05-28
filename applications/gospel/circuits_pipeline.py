@@ -30,8 +30,8 @@ import typer
 app = typer.Typer(add_completion=False)
 
 BASE          = Path("applications/gospel")
-CIRCUITS_BASE = BASE / "circuits"
-SAMPLED_BASE  = BASE / "sampled_circuits"
+CIRCUITS_BASE = BASE / "circuits-2"
+SAMPLED_BASE  = BASE / "sampled_circuits-2"
 
 # ── circuit generation defaults ───────────────────────────────────────────────
 NCIRCUITS   = 1000
