@@ -9,3 +9,5 @@ __pycache__/
 applications/gospel/circuits/
 
 applications/circuits/
+applications/circuits-experiment/
+applications/sampled_circuits-experiment/

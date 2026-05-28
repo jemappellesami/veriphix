@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 import matplotlib
+import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -200,6 +201,48 @@ def _title(p_ent: float, bqp_error: float) -> str:
 
 # ── Plot functions ────────────────────────────────────────────────────────────
 
+def _draw_discrete_frontiers(
+    ax,
+    grid: np.ndarray,
+    frontiers: list[tuple[float, tuple, str]],
+    lw: float = 1.5,
+) -> None:
+    """Draw frontier edges for all max_rho levels without overlap.
+
+    Frontiers are processed most-restrictive-first. Each boundary edge is
+    drawn exactly once, colored by the most restrictive frontier that claims it.
+    This avoids duplicate segments when coarse grid resolution causes two
+    thresholds to share the same tile boundary.
+    """
+    n_w, n_d = grid.shape
+    sorted_frontiers = sorted(frontiers, key=lambda x: x[0])
+
+    edge_to_fidx: dict[tuple, int] = {}
+    for f_idx, (max_rho, _color, _label) in enumerate(sorted_frontiers):
+        safe = ~np.isnan(grid) & (grid <= max_rho)
+        for i in range(n_w):
+            for j in range(n_d):
+                if not safe[i, j]:
+                    continue
+                candidates = []
+                if i == 0 or not safe[i - 1, j]:
+                    candidates.append(((j - 0.5, i - 0.5), (j + 0.5, i - 0.5)))
+                if i == n_w - 1 or not safe[i + 1, j]:
+                    candidates.append(((j - 0.5, i + 0.5), (j + 0.5, i + 0.5)))
+                if j == 0 or not safe[i, j - 1]:
+                    candidates.append(((j - 0.5, i - 0.5), (j - 0.5, i + 0.5)))
+                if j == n_d - 1 or not safe[i, j + 1]:
+                    candidates.append(((j + 0.5, i - 0.5), (j + 0.5, i + 0.5)))
+                for edge in candidates:
+                    if edge not in edge_to_fidx:
+                        edge_to_fidx[edge] = f_idx
+
+    for edge, f_idx in edge_to_fidx.items():
+        (x1, y1), (x2, y2) = edge
+        _, color, _ = sorted_frontiers[f_idx]
+        ax.plot([x1, x2], [y1, y2], color=color, lw=lw, solid_capstyle="butt", zorder=5)
+
+
 def plot_discrete(
     grid: np.ndarray,
     depths: list,
@@ -207,6 +250,8 @@ def plot_discrete(
     p_ent: float,
     bqp_error: float,
     outdir: Path,
+    frontiers: list[tuple[float, tuple, str]] | None = None,
+    suffix: str = "",
 ) -> Path:
     n_w, n_d = len(widths), len(depths)
     vmin, vmax = _color_range(grid)
@@ -228,10 +273,18 @@ def plot_discrete(
             text = "NA" if np.isnan(v) else (f"{v:.1e}" if 0 < v < 0.001 else f"{v:.3f}")
             ax.text(j, i, text, ha="center", va="center", fontsize=10)
 
+    if frontiers:
+        _draw_discrete_frontiers(ax, grid, frontiers)
+        legend_handles = [
+            mlines.Line2D([0], [0], color=color, lw=1.5, label=label)
+            for _max_rho, color, label in sorted(frontiers, key=lambda x: x[0])
+        ]
+        ax.legend(handles=legend_handles, loc="best", fontsize=7, framealpha=0.85)
+
     fig.colorbar(im, ax=ax, label=METRIC_LABEL)
     plt.tight_layout()
 
-    outpath = outdir / f"discrete_p{p_ent:.0e}_bqp{bqp_error}.pdf"
+    outpath = outdir / f"discrete_p{p_ent:.0e}_bqp{bqp_error}{suffix}.pdf"
     fig.savefig(outpath)
     plt.close(fig)
     return outpath
@@ -351,8 +404,12 @@ def main() -> None:
             grid, depths, widths = _build_grid(sub)
 
             path = plot_discrete(grid, depths, widths, p_ent, bqp_error,
-                                 OUTDIR_DISCRETE)
+                                 OUTDIR_DISCRETE, frontiers=frontiers)
             print(f"discrete    → {path}")
+
+            path = plot_discrete(grid, depths, widths, p_ent, bqp_error,
+                                 OUTDIR_DISCRETE, suffix="_nofrontier")
+            print(f"discrete NF → {path}")
 
             path = plot_continuous(grid, depths, widths, p_ent, bqp_error,
                                    OUTDIR_CONTINUOUS, frontiers=frontiers)
