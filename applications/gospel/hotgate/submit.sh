@@ -33,7 +33,7 @@ N_TEST_ROUNDS=100
 BASE_SEED=42
 N_CIRCUITS=100
 
-NOISE_VALUES=(0.2 0.3 0.4 0.5)
+NOISE_VALUES=(0.13 0.16)
 
 # ── decompose task ID into (noise_idx, circuit_idx) ───────────────────────────
 NOISE_IDX=$(( SLURM_ARRAY_TASK_ID / N_CIRCUITS ))

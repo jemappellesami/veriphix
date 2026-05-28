@@ -123,8 +123,8 @@ def main(
     # Plot.
     fig, ax = plt.subplots(figsize=(max(8, n_cols * 0.6), max(5, n_rows * 1.2)))
 
-    cmap   = plt.colormaps["YlOrRd"]
-    norm   = Normalize(vmin=0.0, vmax=float(np.percentile(rate_grid, 95)))
+    cmap   = plt.colormaps["jet"]
+    norm   = Normalize(vmin=0.0, vmax=1)
     radius = 0.38
 
     for u, v in graph.edges():
