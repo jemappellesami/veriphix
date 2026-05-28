@@ -1,18 +1,14 @@
 #!/bin/bash
-# SLURM array job — one task per (circuit, noise level) pair.
+# SLURM array job — one task per (circuit, probability) pair.
 #
 # Submit:
 #   sbatch applications/gospel/hotgate/submit.sh
 #
-# After all tasks finish, plot each noise level:
-#   for p in 0.1 0.01 0.02 0.05 0.07 0.005; do
-#     python applications/gospel/hotgate/plot.py \
-#       --n-qubits 5 --depth 5 --p-ent $p \
-#       --results-dir applications/gospel/hotgate/results/p${p}
-#   done
+# After all tasks finish, plot:
+#   bash applications/gospel/hotgate/plot_all.sh
 
 #SBATCH --job-name=hotgate
-#SBATCH --array=0-599             # 6 noise levels × 100 circuits = 600 tasks
+#SBATCH --array=0-499             # N_PROB_VALUES × N_CIRCUITS - 1  (update if you change PROB_VALUES)
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=8G
 #SBATCH --time=02:00:00
@@ -20,10 +16,7 @@
 #SBATCH --error=applications/gospel/hotgate/logs/slurm_%A_%a.err
 
 # ── environment ───────────────────────────────────────────────────────────────
-# Activate your Python environment here, e.g.:
-#   source /path/to/venv/bin/activate
-# or with conda:
-#   conda activate veriphix
+# source /path/to/venv/bin/activate
 
 # ── parameters ────────────────────────────────────────────────────────────────
 N_QUBITS=5
@@ -32,14 +25,27 @@ BQP_ERROR="1e-1"
 N_TEST_ROUNDS=100
 BASE_SEED=42
 N_CIRCUITS=100
+MALICIOUS_N_NODES=10
 
-NOISE_VALUES=(0.13 0.16)
+# ── noise mode: "depolarising" or "malicious" ─────────────────────────────────
+NOISE_MODEL="malicious"
 
-# ── decompose task ID into (noise_idx, circuit_idx) ───────────────────────────
-NOISE_IDX=$(( SLURM_ARRAY_TASK_ID / N_CIRCUITS ))
+# PROB_VALUES = p_ent for depolarising, malicious_prob for malicious.
+# Update --array upper bound to N_PROB_VALUES × N_CIRCUITS - 1 when changing this.
+PROB_VALUES=(0.1 0.2 0.3 0.4 0.5)
+
+# ── decompose task ID into (prob_idx, circuit_idx) ────────────────────────────
+PROB_IDX=$(( SLURM_ARRAY_TASK_ID / N_CIRCUITS ))
 CIRCUIT_IDX=$(( SLURM_ARRAY_TASK_ID % N_CIRCUITS ))
-P_ENT=${NOISE_VALUES[$NOISE_IDX]}
-OUT_DIR="applications/gospel/hotgate/results/p${P_ENT}"
+PROB=${PROB_VALUES[$PROB_IDX]}
+OUT_DIR="applications/gospel/hotgate/results/${NOISE_MODEL}_p${PROB}"
+
+# ── noise-model-specific args ─────────────────────────────────────────────────
+if [[ "$NOISE_MODEL" == "malicious" ]]; then
+    NOISE_ARGS="--malicious-n-nodes $MALICIOUS_N_NODES --malicious-prob $PROB"
+else
+    NOISE_ARGS="--p-ent $PROB"
+fi
 
 # ── run ───────────────────────────────────────────────────────────────────────
 mkdir -p applications/gospel/hotgate/logs
@@ -50,6 +56,7 @@ python applications/gospel/hotgate/simulate.py \
     --depth         "$DEPTH" \
     --bqp-error     "$BQP_ERROR" \
     --n-test-rounds "$N_TEST_ROUNDS" \
-    --p-ent         "$P_ENT" \
+    --noise-model   "$NOISE_MODEL" \
     --base-seed     "$BASE_SEED" \
-    --out-dir       "$OUT_DIR"
+    --out-dir       "$OUT_DIR" \
+    $NOISE_ARGS

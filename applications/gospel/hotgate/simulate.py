@@ -6,14 +6,17 @@ simple loop.
 
 Usage
 -----
+    # Depolarising noise:
     python applications/gospel/hotgate/simulate.py --circuit-idx 0
-    python applications/gospel/hotgate/simulate.py --circuit-idx $SLURM_ARRAY_TASK_ID \\
-        --n-qubits 6 --depth 6 --bqp-error 1e-1 \\
-        --n-test-rounds 100 --p-ent 2e-3 --out-dir applications/gospel/hotgate/results
+
+    # Malicious noise (fixed subset of 10 nodes, attack prob 0.3):
+    python applications/gospel/hotgate/simulate.py --circuit-idx 0 --malicious
 """
 from __future__ import annotations
 
 import csv
+import enum
+import json
 import time
 from pathlib import Path
 
@@ -25,6 +28,7 @@ from typing_extensions import Annotated
 
 from veriphix.blinding import Secrets
 from veriphix.client import Client
+from veriphix.malicious_noise_model import MaliciousNoiseModel
 from veriphix.protocols import FK12, get_bipartite_coloring, get_node_positions
 from veriphix.sampling_circuits.brickwork_state_transpiler import transpile
 from veriphix.sampling_circuits.qasm_parser import read_qasm
@@ -33,6 +37,11 @@ from veriphix.verifying import TestResult, TrappifiedSchemeParameters
 app = typer.Typer(add_completion=False)
 
 CSV_HEADER = ["node", "col", "row", "failure_count", "total_tests"]
+
+
+class NoiseModelChoice(str, enum.Enum):
+    depolarising = "depolarising"
+    malicious    = "malicious"
 
 
 def _load_pattern(path: Path):
@@ -48,14 +57,17 @@ SAMPLED_BASE = Path("applications/gospel/sampled_circuits")
 
 @app.command()
 def main(
-    circuit_idx:   Annotated[int,   typer.Option(help="Index of the circuit to process (0-based)")] = 0,
-    n_qubits:      Annotated[int,   typer.Option(help="Number of qubits")]                           = 3,
-    depth:         Annotated[int,   typer.Option(help="Circuit depth")]                              = 6,
-    bqp_error:     Annotated[str,   typer.Option(help="BQP error tag (folder suffix, e.g. 1e-1)")]  = "1e-1",
-    n_test_rounds: Annotated[int,   typer.Option(help="Number of test rounds per circuit")]          = 100,
-    p_ent:         Annotated[float, typer.Option(help="Depolarising entanglement error probability")] = 2e-3,
-    base_seed:     Annotated[int,   typer.Option(help="Base RNG seed (actual seed = base_seed + circuit_idx)")] = 42,
-    out_dir:       Annotated[Path,  typer.Option(help="Directory for per-circuit CSV output")]       = Path("applications/gospel/hotgate/results"),
+    circuit_idx:        Annotated[int,   typer.Option(help="Index of the circuit to process (0-based)")] = 0,
+    n_qubits:           Annotated[int,   typer.Option(help="Number of qubits")]                           = 3,
+    depth:              Annotated[int,   typer.Option(help="Circuit depth")]                              = 6,
+    bqp_error:          Annotated[str,   typer.Option(help="BQP error tag (folder suffix, e.g. 1e-1)")]  = "1e-1",
+    n_test_rounds:      Annotated[int,             typer.Option(help="Number of test rounds per circuit")]           = 100,
+    noise_model:        Annotated[NoiseModelChoice, typer.Option(help="Noise model: depolarising or malicious")]    = NoiseModelChoice.depolarising,
+    p_ent:              Annotated[float,            typer.Option(help="Depolarising entanglement error probability")] = 2e-3,
+    malicious_n_nodes:  Annotated[int,             typer.Option(help="Number of nodes in the attacked subset")]     = 10,
+    malicious_prob:     Annotated[float,            typer.Option(help="Probability of attacking in a given round")]  = 0.3,
+    base_seed:          Annotated[int,   typer.Option(help="Base RNG seed (actual seed = base_seed + circuit_idx)")] = 42,
+    out_dir:            Annotated[Path,  typer.Option(help="Directory for per-circuit CSV output")]       = Path("applications/gospel/hotgate/results"),
 ) -> None:
     circuits_dir = SAMPLED_BASE / f"circuits-{n_qubits}-{depth}-{bqp_error}"
     if not circuits_dir.exists():
@@ -75,22 +87,35 @@ def main(
         raise typer.Exit(0)
 
     circuit_path = circuit_files[circuit_idx]
-    # Each circuit gets a unique seed derived from the base so jobs are reproducible
-    # but independent.
+    # Per-circuit seed for simulation randomness.
     rng = np.random.default_rng(base_seed + circuit_idx)
 
-    noise_model = DepolarisingNoiseModel(
-        entanglement_error_prob=p_ent,
-        measure_error_prob=0.0,
-        x_error_prob=0.0,
-        z_error_prob=0.0,
-        measure_channel_prob=0.0,
-    )
-
     t0 = time.monotonic()
-    typer.echo(f"[{circuit_idx}] {circuit_path.name}  p_ent={p_ent:.1e}  rounds={n_test_rounds}")
 
     pattern = _load_pattern(circuit_path)
+    all_nodes = list(range(pattern.n_node))
+
+    if noise_model == NoiseModelChoice.malicious:
+        # Fixed subset chosen from base_seed alone — same across all circuits and rounds.
+        subset_rng = np.random.default_rng(base_seed)
+        attacked_nodes = sorted(subset_rng.choice(all_nodes, size=malicious_n_nodes, replace=False).tolist())
+
+        # Save attacked nodes once for reference (idempotent — all tasks compute the same list).
+        nodes_file = out_dir / "attacked_nodes.json"
+        if not nodes_file.exists():
+            nodes_file.write_text(json.dumps(attacked_nodes))
+
+        active_noise_model = MaliciousNoiseModel(nodes=attacked_nodes, prob=malicious_prob, rng=rng)
+        typer.echo(f"[{circuit_idx}] {circuit_path.name}  malicious  nodes={attacked_nodes}  prob={malicious_prob}  rounds={n_test_rounds}")
+    else:
+        active_noise_model = DepolarisingNoiseModel(
+            entanglement_error_prob=p_ent,
+            measure_error_prob=0.0,
+            x_error_prob=0.0,
+            z_error_prob=0.0,
+            measure_channel_prob=0.0,
+        )
+        typer.echo(f"[{circuit_idx}] {circuit_path.name}  p_ent={p_ent:.1e}  rounds={n_test_rounds}")
 
     node_positions = {
         node: (int(pos[0]), int(pos[1]))
@@ -114,7 +139,7 @@ def main(
     outcomes = client.delegate_canvas(
         canvas=canvas,
         backend_cls=DensityMatrixBackend,
-        noise_model=noise_model,
+        noise_model=active_noise_model,
         rng=rng,
     )
 
