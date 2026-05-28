@@ -46,7 +46,7 @@ def _load_pattern(path: Path):
 @app.command()
 def main(
     circuit_idx: Annotated[int,  typer.Option(help="Index of the circuit to process (0-based)")] = 0,
-    circuits_dir: Annotated[Path, typer.Option(help="Directory containing .qasm circuit files")] = Path("applications/gospel/circuits/circuits-3-6"),
+    circuits_dir: Annotated[Path, typer.Option(help="Directory containing .qasm circuit files")] = Path("applications/gospel/circuits/circuits-6-6"),
     n_test_rounds: Annotated[int,  typer.Option(help="Number of test rounds per circuit")]          = 100,
     p_ent: Annotated[float, typer.Option(help="Depolarising entanglement error probability")]  = 2e-3,
     base_seed: Annotated[int,  typer.Option(help="Base RNG seed (actual seed = base_seed + circuit_idx)")] = 42,
