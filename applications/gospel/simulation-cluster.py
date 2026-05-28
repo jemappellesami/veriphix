@@ -34,8 +34,8 @@ from graphix.sim.density_matrix import DensityMatrixBackend
 
 from veriphix.blinding import Secrets
 from veriphix.client import Client
-from veriphix.protocols import RandomTraps
-from veriphix.sampling_circuits.brickwork_state_transpiler import transpile
+from veriphix.protocols import FK12
+from veriphix.sampling_circuits.brickwork_state_transpiler import transpile, get_bipartite_coloring
 from veriphix.sampling_circuits.qasm_parser import read_qasm
 from veriphix.verifying import TrappifiedSchemeParameters
 
@@ -127,7 +127,7 @@ class Run:
             client = Client(
                 pattern=pattern,
                 secrets=Secrets(a=True, r=True, theta=True),
-                protocol=RandomTraps(),
+                protocol=FK12(manual_colouring=get_bipartite_coloring(pattern=pattern)),
                 parameters=TrappifiedSchemeParameters(
                     comp_rounds=0, test_rounds=self.test_rounds, threshold=0
                 ),
