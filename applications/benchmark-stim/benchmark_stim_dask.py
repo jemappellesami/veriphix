@@ -383,6 +383,12 @@ def main(
         typer.echo(f"Resuming: {len(done)} cells already in {out_csv}")
     cells = [c for c in cells if (str(c.p_ent), str(c.width), str(c.depth)) not in done]
 
+    # Submit largest tiles first (LPT scheduling): cost per tile ~ |V| = width*(4*depth+1).
+    # Starting the expensive tiles early lets the many cheap ones backfill idle workers, so
+    # the run doesn't end with a few monster tiles on 2-3 workers while the rest sit idle.
+    # Also makes the ETA honest from the start instead of optimistic-then-climbing.
+    cells.sort(key=lambda c: c.width * (4 * c.depth + 1), reverse=True)
+
     typer.echo(
         f"grid: {len(width_list)} widths x {len(depth_list)} depths x {len(ent_list)} noise levels "
         f"= {n_cells_total} cells ({len(cells)} to run); "
