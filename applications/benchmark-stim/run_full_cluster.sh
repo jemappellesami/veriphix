@@ -17,7 +17,6 @@
 # skips any (p_ent, width, depth) tile already in that CSV.
 
 set -e
-cd /Users/sabdulsa/Codes/veriphix
 
 WMIN=${1:-1}
 WMAX=${2:-40}
