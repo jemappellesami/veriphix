@@ -4,7 +4,8 @@
 set -e
 cd /Users/sabdulsa/Codes/veriphix
 
-./.venv/bin/python applications/benchmark-stim/benchmark_stim_dask.py \
+export PYTHONUNBUFFERED=1
+./.venv/bin/python -u applications/benchmark-stim/benchmark_stim_dask.py \
   --widths 1,2,3,4,5 \
   --depths 1,2,3,4,5 \
   --ent-errors 1e-5 \
