@@ -331,6 +331,36 @@ def _fmt(seconds: float) -> str:
     return f"{int(m)}m{s:04.1f}s" if m else f"{s:.2f}s"
 
 
+def _estimate_eta(
+    v_done: list[float],
+    t_done: list[float],
+    cpu_done: float,
+    wall_elapsed: float,
+    remaining_count: int,
+    remaining_v_sum: float,
+) -> float:
+    """ETA from a linear cost model ``t ≈ a + b·|V|`` fit on completed tiles.
+
+    Per-tile cost is ~linear in |V| (measured R²≈0.999), so the remaining CPU-time is
+    ``a·n_remaining + b·Σ|V|_remaining``. Dividing by the *effective parallelism*
+    (CPU-seconds completed per wall-second ≈ number of busy workers) gives wall-time
+    remaining — self-calibrating, no need to know the worker count. Falls back to a flat
+    mean until there are enough points (with |V| spread) to fit a line.
+    """
+    if wall_elapsed <= 0 or remaining_count <= 0:
+        return 0.0
+    parallelism = max(cpu_done / wall_elapsed, 1e-9)
+    vd = np.asarray(v_done, dtype=float)
+    td = np.asarray(t_done, dtype=float)
+    if len(td) >= 3 and vd.std() > 1e-9:
+        b, a = np.polyfit(vd, td, 1)
+        remaining_cpu = a * remaining_count + b * remaining_v_sum
+    else:
+        mean_t = float(td.mean()) if len(td) else 0.0
+        remaining_cpu = mean_t * remaining_count
+    return max(remaining_cpu, 0.0) / parallelism
+
+
 # ── main ──────────────────────────────────────────────────────────────────────────
 
 
@@ -386,8 +416,14 @@ def main(
     # Submit largest tiles first (LPT scheduling): cost per tile ~ |V| = width*(4*depth+1).
     # Starting the expensive tiles early lets the many cheap ones backfill idle workers, so
     # the run doesn't end with a few monster tiles on 2-3 workers while the rest sit idle.
-    # Also makes the ETA honest from the start instead of optimistic-then-climbing.
     cells.sort(key=lambda c: c.width * (4 * c.depth + 1), reverse=True)
+    # Bracket the |V| range for the ETA regression: run a few of the SMALLEST tiles right
+    # after the first few largest, so within the first ~6 completions the fit has points
+    # spanning low-to-high |V| (interpolation, not extrapolation). The biggest tiles stay
+    # at the very front for load-balancing; the small calibration tiles cost ~nothing.
+    n_calib = 3
+    if len(cells) > 3 * n_calib:
+        cells = cells[:n_calib] + cells[-n_calib:] + cells[n_calib:-n_calib]
 
     typer.echo(
         f"grid: {len(width_list)} widths x {len(depth_list)} depths x {len(ent_list)} noise levels "
@@ -422,6 +458,14 @@ def main(
     n_ok = n_fail = 0
     loop_start = time.monotonic()
 
+    # ETA model state: completed (|V|, time) points, accumulated CPU-time, and the
+    # running count / |V|-sum of tiles still to do (see _estimate_eta).
+    v_done: list[float] = []
+    t_done: list[float] = []
+    cpu_done = 0.0
+    remaining_count = len(cells)
+    remaining_v_sum = float(sum(c.width * (4 * c.depth + 1) for c in cells))
+
     try:
         futures = [dask_client.submit(Cell.execute, c, pure=False) for c in cells]
 
@@ -436,15 +480,23 @@ def main(
                 except Exception as exc:
                     typer.echo(f"Future error: {exc}")
                     n_fail += 1
+                    remaining_count -= 1  # keep ETA accounting consistent
                     continue
                 finally:
                     fut.release()  # free the worker-side result promptly
 
-                n_done = n_ok + n_fail + 1
+                this_v = report.width * (4 * report.depth + 1)
+                remaining_count -= 1
+                remaining_v_sum -= this_v
+                cpu_done += report.elapsed_s
+                if isinstance(report, CellResult):
+                    v_done.append(this_v)
+                    t_done.append(report.elapsed_s)
+
                 wall_elapsed = time.monotonic() - loop_start
-                throughput = n_done / wall_elapsed  # cells/s (reflects parallelism)
-                remaining = len(cells) - n_done
-                eta_str = _fmt(remaining / throughput) if throughput > 0 else "?"
+                eta_str = _fmt(
+                    _estimate_eta(v_done, t_done, cpu_done, wall_elapsed, remaining_count, remaining_v_sum)
+                )
 
                 if isinstance(report, CellResult):
                     writer.writerow(
