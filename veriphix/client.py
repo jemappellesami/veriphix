@@ -311,6 +311,7 @@ class Client:
         rng: Generator | None = None,
     ) -> ComputationResult[_StateT]:
         self.refresh_randomness(rng=rng)
+        self.computation_states = self.get_computation_states()
         self.prepare_states(backend, states_dict=self.computation_states)
         sim = PatternSimulator(
             backend=backend,

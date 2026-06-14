@@ -56,7 +56,7 @@ class SecretDatas:
         if secrets.r:
             # Need to generate the random bit for each measured qubit, 0 for the rest (output qubits)
             for node in graph.nodes:
-                r[node] = outcome(rng.integers(2) == 1) if node not in output_nodes else 0
+                r[node] = outcome(rng.integers(2) == 1) # if node not in output_nodes else 0
 
         theta = {}
         if secrets.theta:
@@ -70,7 +70,7 @@ class SecretDatas:
             # Create `a` secret for all
             # order is Z(theta) X |+>
             for node in graph.nodes:
-                a[node] = outcome(rng.integers(0, 2) == 1) if node in input_nodes else 0
+                a[node] = outcome(rng.integers(2) == 1) if node in input_nodes else 0
 
             # After all the `a` secrets have been generated, the `a_N` value can be
             # computed from the graph topology

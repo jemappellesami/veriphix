@@ -4,14 +4,15 @@ import numpy as np
 from graphix.measurements import Outcome
 from graphix.random_objects import rand_circuit
 from graphix.sim.statevec import StatevectorBackend
+from graphix.simulator import PatternSimulator
 from graphix.states import BasicStates
 from numpy.random import Generator
 from stim import PauliString
 from typing_extensions import override
 
 from veriphix.blinding import Secrets
-from veriphix.client import Client, ClientMeasureMethod
-from veriphix.verifying import ComputationRun, get_graph_clifford_structure
+from veriphix.client import Client, ClientMeasureMethod, SecretDatas
+from veriphix.verifying import ComputationRun, get_graph_clifford_structure, ClassicalComputationResult
 
 
 class TestClient:
@@ -247,6 +248,58 @@ class TestClient:
         outcomes = comp_run.accept(client, backend, None, fx_rng)
         assert outcomes is not None
         # TODO: assert something ? generate BQP computation for that
+
+
+    def test_bug_secrets_randomness(self, fx_rng:Generator) -> None:
+        nqubits = 3
+        depth = 2
+        circuit = rand_circuit(nqubits, depth, fx_rng)
+        pattern = circuit.transpile().pattern
+
+        def get_output_flip(client:Client):
+            flip_values = dict()
+            for node in client.output_nodes:
+                r_value = client.secret_datas.r.get(node, 0)
+                a_N_value = client.secret_datas.a.a_N.get(node, 0)
+                flip_values[node] = r_value ^ a_N_value
+            return flip_values
+        
+        client = Client(pattern=pattern, rng=fx_rng)
+        for node in client.output_nodes:
+            print(client.secret_datas.r[node])
+        print(client.secret_datas)
+        initial_flip_values = get_output_flip(client=client)
+        print(get_output_flip(client=client))
+        canvas = client.sample_canvas()
+        
+        # client.delegate_canvas(canvas=canvas, backend_cls=StatevectorBackend)
+        outcomes = dict()
+        for r in canvas:
+            backend = StatevectorBackend()
+            if isinstance(canvas[r], ComputationRun):
+                # outcomes[r] = canvas[r].accept(executor=client, backend=backend, rng=fx_rng, noise_model=None)
+                client.refresh_randomness(rng=fx_rng)
+                print(get_output_flip(client=client))
+                client.prepare_states(backend, states_dict=client.computation_states)
+                sim = PatternSimulator(
+                    backend=backend,
+                    pattern=client.clean_pattern,
+                    prepare_method=client.prepare_method,
+                    measure_method=client.measure_method,
+                    noise_model=None,
+                )
+                sim.run(input_state=None, rng=fx_rng)
+                # if not client.classical_output:
+                #     client.decode_output_state(backend)
+                #     return QuantumComputationResult(backend.state)
+                results: dict[int, Outcome] = {onode: client.results[onode] for onode in client.output_nodes}
+                outcomes[r]= ClassicalComputationResult(outcomes=results)
+        # print(canvas)
+        # for round, run in canvas.items():
+        #     print(round, run)
+        #     if isinstance(run, ComputationRun):
+        #         print()
+        # pass
 
     def test_graph_clifford_structure(self, fx_rng: Generator) -> None:
         nqubits = 5

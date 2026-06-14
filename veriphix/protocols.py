@@ -14,16 +14,24 @@ import stim
 from graphix.rng import ensure_rng
 from typing_extensions import override
 
+from veriphix.trap_optimization import (
+    build_detection_matrix,
+    independent_set_pool,
+    solve_trap_distribution,
+)
 from veriphix.verifying import TestRun, build_stabilizer
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from typing import TypeVar
 
+    import numpy as np
     from graphix import Pattern
     from numpy.random import Generator
 
     _StateT = TypeVar("_StateT")
+
+TestPoolFn: TypeAlias = Callable[[nx.Graph], "list[TestRun]"]
 
 BRICKWORK_DETECTION_RATE = 1 / 14
 
@@ -398,3 +406,109 @@ class Dummyless(VerificationProtocol):
     ) -> TestRun:
         rng = ensure_rng(rng, stacklevel=stacklevel + 1)
         return test_runs[rng.integers(len(test_runs))]
+
+
+class OptimizedTraps(VerificationProtocol):
+    """Trap protocol whose test distribution is optimised for a known error set.
+
+    Where :class:`RandomTraps` and :class:`FK12` sample tests *uniformly* and
+    guarantee only a worst-case detection rate against *all* deviations, this
+    protocol solves *Problem 1* of arXiv:2206.00631 (see
+    :mod:`veriphix.trap_optimization`): given the set of errors the device
+    actually produces, it computes — via a linear program — the distribution over
+    feasible tests that maximises the *worst-case detection rate over that error
+    set*.  Concentrating the test budget on the errors that matter lets the
+    detection rate climb above the uniform ``1/χ(G)`` baseline (up to the optimum
+    ``1/χ_f(G)`` for standard traps), which in turn lowers the number of rounds
+    needed to reach a target security level.
+
+    The intended workflow is fully client-side: a client first *learns* where its
+    device is noisy (e.g. from the trap-failure heatmap of an earlier experiment),
+    turns that heatmap into a set of likely Pauli deviations ``errors``, and
+    instantiates this protocol with them.  The optimal test distribution and the
+    achieved detection rate are then computed without any further quantum runs.
+
+    Parameters
+    ----------
+    errors : Sequence[stim.PauliString]
+        The deviations ℰ to optimise detection for, as Pauli strings over the
+        graph nodes (in ``list(graph.nodes)`` order).
+    test_pool : Callable[[nx.Graph], list[TestRun]]
+        Builder for the feasible test set ℋ.  Defaults to
+        :func:`~veriphix.trap_optimization.independent_set_pool`, the standard-trap
+        pool whose optimum is the fractional-colouring detection rate ``1/χ_f(G)``.
+    mass : float
+        Total probability mass over tests (``Σ p = mass``).  ``1.0`` (default)
+        gives a proper distribution; ``< 1`` leaves mass for non-test rounds.
+
+    Notes
+    -----
+    :meth:`create_test_runs` must be called before :attr:`detection_rate` and
+    :meth:`sample_test_run` are meaningful — it both builds the pool and solves
+    the LP, mirroring :class:`FK12`.  After solving, :attr:`adversary` holds the
+    LP dual: the optimal attack distribution over ``errors`` (the deviations that
+    are hardest for the chosen tests to catch).
+    """
+
+    def __init__(
+        self,
+        errors: Sequence[stim.PauliString],
+        test_pool: TestPoolFn = independent_set_pool,
+        mass: float = 1.0,
+    ) -> None:
+        super().__init__()
+        self.errors = list(errors)
+        self.test_pool = test_pool
+        self.mass = mass
+        self._detection_rate = float("nan")
+        self._distribution: np.ndarray | None = None
+        self.adversary: np.ndarray | None = None
+
+    @property
+    @override
+    def detection_rate(self) -> float:
+        return self._detection_rate
+
+    @property
+    def distribution(self) -> np.ndarray | None:
+        """Optimal probability per test, aligned with the last :meth:`create_test_runs`."""
+        return self._distribution
+
+    @override
+    def create_test_runs(
+        self,
+        graph: nx.Graph,
+        rng: Generator | None = None,
+        *,
+        stacklevel: int = 1,
+    ) -> list[TestRun]:
+        """Build the feasible test pool and solve Problem 1 for it.
+
+        Returns the pool ℋ (index-aligned with :attr:`distribution`) and, as a
+        side effect, sets :attr:`detection_rate` to the LP optimum ``ε`` and
+        :attr:`adversary` to the optimal attack distribution.
+        """
+        pool = self.test_pool(graph)
+        if not pool:
+            raise ValueError("test_pool produced no tests for the given graph.")
+        detection_matrix = build_detection_matrix(graph, pool, self.errors)
+        result = solve_trap_distribution(detection_matrix, mass=self.mass)
+        self._distribution = result.distribution
+        self._detection_rate = result.detection_rate
+        self.adversary = result.adversary
+        return pool
+
+    @override
+    def sample_test_run(
+        self,
+        graph: nx.Graph,
+        test_runs: list[TestRun],
+        rng: Generator | None = None,
+        *,
+        stacklevel: int = 1,
+    ) -> TestRun:
+        if self._distribution is None:
+            raise RuntimeError("create_test_runs must be called before sample_test_run.")
+        rng = ensure_rng(rng, stacklevel=stacklevel + 1)
+        index = int(rng.choice(len(test_runs), p=self._distribution))
+        return test_runs[index]

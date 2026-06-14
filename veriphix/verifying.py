@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar, Union
 
 import stim
 from graphix.fundamentals import IXYZ_VALUES
@@ -14,6 +15,11 @@ from typing_extensions import override
 
 Trap = AbstractSet[int]
 Traps = AbstractSet[Trap]
+
+# A measurement basis specification: either a single Pauli letter applied to every
+# trap node (uniform basis), or a per-node mapping {node: basis} (mixed-basis trap).
+NodeBases = Mapping[int, str]
+MeasBasis = Union[str, NodeBases]
 
 
 if TYPE_CHECKING:
@@ -95,21 +101,45 @@ def get_graph_clifford_structure(graph: nx.Graph[int]) -> stim.Tableau:
     return circuit.to_tableau()
 
 
+def _basis_at(node: int, meas_basis: MeasBasis) -> str:
+    """The measurement basis of ``node`` under a uniform (str) or per-node (mapping) spec."""
+    return meas_basis if isinstance(meas_basis, str) else meas_basis[node]
+
+
 def build_stabilizer(
     graph: nx.Graph,
     nqubits: int,
     traps: Traps,
-    meas_basis: str = "X",
+    meas_basis: MeasBasis = "X",
 ) -> PauliString:
+    """Compute the stabiliser of a trap (or set of traps).
+
+    ``meas_basis`` may be either
+
+      * a single Pauli letter (``"X"``/``"Y"``/``"Z"``) applied to *every* trap
+        node — the uniform-basis trap, or
+      * a mapping ``{node: basis}`` giving each node its own measurement basis —
+        a **mixed-basis trap** (e.g. ``{0: "X", 2: "Y", 3: "X"}`` measured in one
+        round).
+
+    Each atomic trap's measurement Pauli is conjugated by the graph's ``CZ``
+    structure (so a node's neighbours pick up ``Z`` dummies), and the conjugated
+    operators are merged.  For a mapping, only the nodes appearing in a trap need
+    a basis entry.
+    """
     nodes = list(graph.nodes)
-    measurement_strings = [PauliString([meas_basis if node in trap else "I" for node in nodes]) for trap in traps]
+    measurement_strings = [
+        PauliString([_basis_at(node, meas_basis) if node in trap else "I" for node in nodes])
+        for trap in traps
+    ]
     clifford_structure = get_graph_clifford_structure(graph=graph)
     conjugated_measurements = [clifford_structure.inverse()(meas) for meas in measurement_strings]
     return merge(conjugated_measurements)
 
 
 class TestRun(Run):
-    meas_basis: Literal["_", "I", "X", "Y", "Z"]
+    #: Uniform basis (a single Pauli letter) or a per-node mapping ``{node: basis}``.
+    meas_basis: MeasBasis
 
     __test__ = False  # this is not a pytest test-suite
 
@@ -118,13 +148,22 @@ class TestRun(Run):
         graph: nx.Graph,
         nqubits: int,
         traps: Traps,
-        meas_basis: Literal["_", "I", "X", "Y", "Z"] = "X",
+        meas_basis: MeasBasis = "X",
     ) -> None:
         self.traps = frozenset(traps)
         self.meas_basis = meas_basis
         self.nqubits = nqubits
         self.stabilizer = build_stabilizer(graph, nqubits, traps, meas_basis)
         self.input_state = dict(zip(graph.nodes, generate_eigenstate(self.stabilizer)))
+
+    def basis_at(self, node: int) -> str:
+        """Measurement basis applied to ``node`` (handles uniform or per-node specs)."""
+        return _basis_at(node, self.meas_basis)
+
+    @property
+    def is_mixed_basis(self) -> bool:
+        """True if different nodes use different measurement bases."""
+        return not isinstance(self.meas_basis, str)
 
     @override
     def accept(

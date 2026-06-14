@@ -18,8 +18,15 @@ from veriphix.client import Client
 from veriphix.protocols import (
     FK12,
     Dummyless,
+    OptimizedTraps,
     RandomTraps,
     VerificationProtocol,
+)
+from veriphix.trap_optimization import (
+    build_detection_matrix,
+    independent_set_pool,
+    single_qubit_trap_pool,
+    solve_trap_distribution,
 )
 from veriphix.verifying import TestRun, build_stabilizer
 
@@ -220,3 +227,117 @@ def assert_from_canonical_basis(test_runs: list[TestRun], graph: nx.Graph, n_qub
             f"  got      {run.stabilizer}\n"
             f"  expected {expected}"
         )
+
+
+def _z_error(n_nodes: int, node: int) -> stim.PauliString:
+    """Single-qubit Z deviation on `node` as a length-`n_nodes` Pauli string."""
+    return stim.PauliString("".join("Z" if i == node else "I" for i in range(n_nodes)))
+
+
+class TestOptimizedTraps:
+    """Problem 1 (arXiv:2206.00631): LP-optimised trap distributions."""
+
+    def test_pentagon_reproduces_fractional_chromatic_rate(self) -> None:
+        """C5 with single-qubit Z errors: optimal rate is 2/5 = 1/chi_f(C5).
+
+        Reproduces the worked example from the paper: a uniform distribution over
+        the five maximal independent sets {0,2},{1,3},{2,4},{0,3},{1,4} achieves a
+        detection rate of 2/5, beating the 1/3 of a proper 3-colouring (FK12).
+        """
+        graph = nx.cycle_graph(5)
+        errors = [_z_error(5, v) for v in range(5)]
+
+        protocol = OptimizedTraps(errors=errors)
+        pool = protocol.create_test_runs(graph)
+
+        assert len(pool) == 5
+        assert protocol.detection_rate == pytest.approx(2 / 5)
+        # Optimum is the uniform fractional colouring.
+        np.testing.assert_allclose(protocol.distribution, np.full(5, 1 / 5), atol=1e-7)
+
+    def test_beats_fk12_proper_colouring(self) -> None:
+        graph = nx.cycle_graph(5)
+        errors = [_z_error(5, v) for v in range(5)]
+
+        optimized = OptimizedTraps(errors=errors)
+        optimized.create_test_runs(graph)
+
+        fk12 = FK12()
+        fk12.create_test_runs(graph)
+
+        assert optimized.detection_rate > fk12.detection_rate
+
+    def test_detection_matrix_membership(self) -> None:
+        """For single-qubit Z errors, a canvas detects Z_v iff v is in its trap set."""
+        graph = nx.cycle_graph(5)
+        pool = independent_set_pool(graph)
+        errors = [_z_error(5, v) for v in range(5)]
+        matrix = build_detection_matrix(graph, pool, errors)
+
+        for i, run in enumerate(pool):
+            trap_nodes = set().union(*run.traps)
+            for v in range(5):
+                assert bool(matrix[i, v]) == (v in trap_nodes)
+
+    def test_distribution_is_valid_probability(self) -> None:
+        graph = nx.cycle_graph(5)
+        errors = [_z_error(5, v) for v in range(5)]
+        protocol = OptimizedTraps(errors=errors)
+        protocol.create_test_runs(graph)
+
+        dist = protocol.distribution
+        assert dist is not None
+        assert np.all(dist >= -1e-9)
+        assert dist.sum() == pytest.approx(1.0)
+        assert 0.0 <= protocol.detection_rate <= 1.0
+
+    def test_dual_recovers_detection_rate(self) -> None:
+        """Strong duality: the adversary distribution sums to one and the LP is tight."""
+        graph = nx.cycle_graph(5)
+        errors = [_z_error(5, v) for v in range(5)]
+        matrix = build_detection_matrix(graph, pool := independent_set_pool(graph), errors)
+        result = solve_trap_distribution(matrix)
+
+        assert result.adversary.shape == (len(errors),)
+        assert result.adversary.sum() == pytest.approx(1.0)
+        # Worst-case detection under the primal distribution equals the LP value.
+        coverage = matrix.T @ result.distribution
+        assert coverage.min() == pytest.approx(result.detection_rate)
+        assert len(pool) == matrix.shape[0]
+
+    def test_sample_before_solve_raises(self) -> None:
+        graph = nx.cycle_graph(5)
+        protocol = OptimizedTraps(errors=[_z_error(5, 0)])
+        with pytest.raises(RuntimeError):
+            protocol.sample_test_run(graph, [])
+
+    def test_sample_returns_test_from_pool(self, fx_rng: np.random.Generator) -> None:
+        graph = nx.cycle_graph(5)
+        protocol = OptimizedTraps(errors=[_z_error(5, v) for v in range(5)])
+        pool = protocol.create_test_runs(graph)
+        sampled = protocol.sample_test_run(graph, pool, rng=fx_rng)
+        assert sampled in pool
+
+    def test_no_errors_gives_full_detection(self) -> None:
+        graph = nx.cycle_graph(5)
+        protocol = OptimizedTraps(errors=[])
+        protocol.create_test_runs(graph)
+        assert protocol.detection_rate == pytest.approx(1.0)
+
+    def test_undetectable_error_warns_and_zero_rate(self) -> None:
+        """An error commuting with every trap (here, the identity) is undetectable."""
+        graph = nx.cycle_graph(5)
+        identity = stim.PauliString(5)
+        protocol = OptimizedTraps(errors=[identity])
+        with pytest.warns(UserWarning):
+            protocol.create_test_runs(graph)
+        assert protocol.detection_rate == pytest.approx(0.0, abs=1e-6)
+
+    def test_single_qubit_pool_also_solves(self) -> None:
+        """The protocol works with an alternative feasible-test pool."""
+        graph = nx.cycle_graph(5)
+        errors = [_z_error(5, v) for v in range(5)]
+        protocol = OptimizedTraps(errors=errors, test_pool=single_qubit_trap_pool)
+        pool = protocol.create_test_runs(graph)
+        assert len(pool) == 5
+        assert 0.0 <= protocol.detection_rate <= 1.0
