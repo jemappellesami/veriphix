@@ -75,7 +75,8 @@ app = typer.Typer(add_completion=False)
 logging.getLogger("distributed.comm").setLevel(logging.CRITICAL)
 logging.getLogger("distributed.client").setLevel(logging.CRITICAL)
 
-# CSV columns are frozen to match benchmark_stim.py / the heatmap plotter.
+# CSV columns are frozen to match benchmark_stim.py / the heatmap plotter. The shot count
+# is encoded in the output *filename* (one file per precision), not a column.
 CSV_FIELDS = ["p_ent", "width", "depth", "p_failed_round", "p_false_reject"]
 
 
