@@ -1,0 +1,24 @@
+This is release R7.55 of the ToCTeX package.
+
+Release date: May 29, 2018.
+
+It includes:
+
+- eprint.sty, 2.13
+- toc.cls, 3.32
+- tocbase.cls, 4.42
+- tocforeword.cls 0.96
+- toclibrary.cls, 2.4
+- tocplain.bst, 0.31
+- tocspecial 0.1
+- cjtcs.cls, 1.01
+- daj.cls, 1.02
+
+- cjtcs template file
+- daj template file v.33
+- toc template file
+- toc instructions file
+
+Changes over R7.5:
+
+- Eprint version 2.13: new links direct to Weizmann for ECCC.

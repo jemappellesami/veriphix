@@ -1,0 +1,335 @@
+%% Theory of Computing
+%% File: v014a011.bbl
+%% Publication date: June 11, 2018
+%% Authors: Anne Broadbent
+% Define empty bibhead if not already defined
+\providecommand{\bibhead}[1]{}
+% Define tocrefpdfbookmark if not already defined
+\expandafter\ifx\csname pdfbookmark\endcsname\relax%
+  \providecommand{\tocrefpdfbookmark}{}
+\else\providecommand{\tocrefpdfbookmark}{%
+   \hypertarget{tocreferences}{}%
+   \pdfbookmark[1]{References}{tocreferences}}%
+\fi
+
+\tocrefpdfbookmark
+\begin{thebibliography}{10}
+
+\bibitem{AA11}\bibhead{AA11}
+{\sc Scott Aaronson and Alex Arkhipov}: The computational complexity of linear
+  optics.
+\newblock {\em Theory of Computing}, 9(4):143--252, 2013.
+\newblock Preliminary version in
+  \href{http://doi.org/10.1145/1993636.1993682}{STOC'11}.
+\newblock [\epfmtdoi{10.4086/toc.2013.v009a004}, \epfmt{arxiv}{1011.3245}]
+
+\bibitem{AA14}\bibhead{AA14}
+{\sc Scott Aaronson and Alex Arkhipov}: Boson{S}ampling is far from uniform.
+\newblock {\em Quantum Inf. Comput.}, 14(15-16):1383--1423, 2014.
+\newblock [\epfmt{arxiv}{1309.7460}, \epfmt{eccc}{TR13-135}]
+
+\bibitem{ABE10}\bibhead{ABE10}
+{\sc Dorit Aharonov, Michael {Ben-Or}, and Elad Eban}: Interactive proofs for
+  quantum computations.
+\newblock In {\em Proc. 1st Symp. Innovations in Computer Science (ICS'10)},
+  pp. 453--469, 2010.
+\newblock [\epfmt{arxiv}{1704.04487}]
+
+\bibitem{ABEM17}\bibhead{ABEM17}
+{\sc Dorit Aharonov, Michael {Ben-Or}, Elad Eban, and Urmila Mahadev}:
+  Interactive proofs for quantum computations, 2017.
+\newblock [\epfmt{arxiv}{1704.04487}]
+
+\bibitem{AJL06}\bibhead{AJL06}
+{\sc Dorit Aharonov, Vaughan Jones, and Zeph Landau}: A polynomial quantum
+  algorithm for approximating the {J}ones polynomial.
+\newblock {\em Algorithmica}, 55(3):395--421, 2009.
+\newblock Preliminary version in
+  \href{http://doi.org/10.1145/1132516.1132579}{STOC'06}.
+\newblock [\epfmtdoi{10.1007/s00453-008-9168-0},
+  \epfmt{arxiv}{quant-ph/0511096}]
+
+\bibitem{AV14}\bibhead{AV14}
+{\sc Dorit Aharonov and Umesh Vazirani}: Is {Q}uantum {M}echanics falsifiable?
+  {A} computational perspective on the foundations of {Q}uantum {M}echanics.
+\newblock In {\em Computability: Turing, G{\"o}del, Church, and Beyond}, pp.
+  329--349. MIT Press, 2013.
+\newblock [\epfmt{arxiv}{1206.3686}]
+
+\bibitem{AMTW00}\bibhead{AMTW00}
+{\sc Andris Ambainis, Michele Mosca, Alain Tapp, and Ronald de~Wolf}: Private
+  quantum channels.
+\newblock In {\em Proc. 41st FOCS}, pp. 547--553. IEEE Comp. Soc. Press, 2000.
+\newblock [\epfmtdoi{10.1109/SFCS.2000.892142},
+  \epfmt{arxiv}{quant-ph/0003101}]
+
+\bibitem{Bab85}\bibhead{Bab85}
+{\sc L{\'a}szl{\'o} Babai}: Trading group theory for randomness.
+\newblock In {\em Proc. 17th STOC}, pp. 421--429. ACM Press, 1985.
+\newblock [\epfmtdoi{10.1145/22145.22192}]
+
+\bibitem{BCG+02}\bibhead{BCG+02}
+{\sc Howard Barnum, Claude Cr{\'e}peau, Daniel Gottesman, Adam Smith, and Alain
+  Tapp}: Authentication of quantum messages.
+\newblock In {\em Proc. 43rd FOCS}, pp. 449--458. IEEE Comp. Soc. Press, 2002.
+\newblock [\epfmtdoi{10.1109/SFCS.2002.1181969},
+  \epfmt{arxiv}{quant-ph/0205128}]
+
+\bibitem{BFKW13}\bibhead{BFKW13}
+{\sc Stefanie Barz, Joseph~F. Fitzsimons, Elham Kashefi, and Philip Walther}:
+  Experimental verification of quantum computation.
+\newblock {\em Nature Physics}, 9(11):727--731, 2013.
+\newblock [\epfmtdoi{10.1038/nphys2763}, \epfmt{arxiv}{1309.0005}]
+
+\bibitem{BCG+06}\bibhead{BCG+06}
+{\sc Michael {Ben-Or}, Claude Cr\'{e}peau, Daniel Gottesman, Avinatan Hassidim,
+  and Adam Smith}: Secure multiparty quantum computation with (only) a strict
+  honest majority.
+\newblock In {\em Proc. 47th FOCS}, pp. 249--260. IEEE Comp. Soc. Press, 2006.
+\newblock [\epfmtdoi{10.1109/FOCS.2006.68}, \epfmt{arxiv}{0801.1544}]
+
+\bibitem{BMP+00}\bibhead{BMP+00}
+{\sc P.~Oscar Boykin, Tal Mor, Matthew Pulver, Vwani Roychowdhury, and Farrokh
+  Vatan}: A new universal and fault-tolerant quantum basis.
+\newblock {\em Inform. Process. Lett.}, 75(3):101--107, 2000.
+\newblock [\epfmtdoi{10.1016/S0020-0190(00)00084-3},
+  \epfmt{arxiv}{quant-ph/9906054}]
+
+\bibitem{BCC88}\bibhead{BCC88}
+{\sc Gilles Brassard, David Chaum, and Claude Cr{\'e}peau}: Minimum disclosure
+  proofs of knowledge.
+\newblock {\em J. Comput. System Sci.}, 37(2):156--189, 1988.
+\newblock [\epfmtdoi{10.1016/0022-0000(88)90005-0}]
+
+\bibitem{Bro15}\bibhead{Bro15}
+{\sc Anne Broadbent}: Delegating private quantum computations.
+\newblock {\em Canad. J. Physics}, 93(9):941--946, 2015.
+\newblock [\epfmtdoi{10.1139/cjp-2015-0030}, \epfmt{arxiv}{1506.01328}]
+
+\bibitem{BFK09}\bibhead{BFK09}
+{\sc Anne Broadbent, Joseph~F. Fitzsimons, and Elham Kashefi}: Universal blind
+  quantum computation.
+\newblock In {\em Proc. 50th FOCS}, pp. 517--526. IEEE Comp. Soc. Press, 2009.
+\newblock [\epfmtdoi{10.1109/FOCS.2009.36}, \epfmt{arxiv}{0807.4154}]
+
+\bibitem{BGS13}\bibhead{BGS13}
+{\sc Anne Broadbent, Gus Gutoski, and Douglas Stebila}: Quantum one-time
+  programs.
+\newblock In {\em Proc. 33rd Ann. Intern. Cryptology Conf. (CRYPTO'13)}, pp.
+  344--360, 2013.
+\newblock [\epfmtdoi{10.1007/978-3-642-40084-1\_20}, \epfmt{arxiv}{1211.1080}]
+
+\bibitem{BJ15}\bibhead{BJ15}
+{\sc Anne Broadbent and Stacey Jeffery}: Quantum homomorphic encryption for
+  circuits of low {T}-gate complexity.
+\newblock In {\em Proc. 35th Ann. Intern. Cryptology Conf. (CRYPTO'15)}, pp.
+  609--629, 2015.
+\newblock [\epfmtdoi{10.1007/978-3-662-48000-7\_30}, \epfmt{arxiv}{1412.8766}]
+
+\bibitem{CLN05}\bibhead{CLN05}
+{\sc Andrew~M. Childs, Debbie~W. Leung, and Michael~A. Nielsen}: Unified
+  derivations of measurement-based schemes for quantum computation.
+\newblock {\em Phys. Rev. A}, 71(3):032318, 2005.
+\newblock [\epfmtdoi{10.1103/PhysRevA.71.032318},
+  \epfmt{arxiv}{quant-ph/0404132}]
+
+\bibitem{CGJV17}\bibhead{CGJV17}
+{\sc Andrea Coladangelo, Alex Grilo, Stacey Jeffery, and Thomas Vidick}:
+  Verifier-on-a-leash: new schemes for verifiable delegated quantum
+  computation, with quasilinear resources, 2017.
+\newblock [\epfmt{arxiv}{1708.07359}]
+
+\bibitem{CL95}\bibhead{CL95}
+{\sc Anne Condon and Richard~E. Ladner}: Interactive proof systems with
+  polynomially bounded strategies.
+\newblock {\em J. Comput. System Sci.}, 50(3):506--518, 1995.
+\newblock Preliminary version in \href{10.1109/SCT.1992.215403}{SCT'92}.
+\newblock [\epfmtdoi{10.1109/SCT.1992.215403}]
+
+\bibitem{DFSS05}\bibhead{DFSS05}
+{\sc Ivan~B. Damg{\aa}rd, Serge Fehr, Louis Salvail, and Christian Schaffner}:
+  Cryptography in the bounded-quantum-storage model.
+\newblock {\em SIAM J. Comput.}, 37(6):1865--1890, 2008.
+\newblock Preliminary version in
+  \href{http://doi.org/10.1109/SFCS.2005.30}{FOCS'05}.
+\newblock [\epfmtdoi{10.1137/060651343}, \epfmt{arxiv}{quant-ph/0508222}]
+
+\bibitem{DCEL09}\bibhead{DCEL09}
+{\sc Christoph Dankert, Richard Cleve, Joseph Emerson, and Etera Livine}: Exact
+  and approximate unitary 2-designs and their application to fidelity
+  estimation.
+\newblock {\em Phys. Rev. A}, 80(1):012304, 2009.
+\newblock [\epfmtdoi{10.1103/PhysRevA.80.012304},
+  \epfmt{arxiv}{quant-ph/0606161}]
+
+\bibitem{DFPR14}\bibhead{DFPR14}
+{\sc Vedran Dunjko, Joseph~F. Fitzsimons, Christopher Portmann, and Renato
+  Renner}: Composable security of delegated quantum computation.
+\newblock In {\em 20th Internat. Conf. on the Theory and Appl. of Cryptology
+  and Information Security (ASIACRYPT'14)}, pp. 406--425, 2014.
+\newblock [\epfmtdoi{10.1007/978-3-662-45608-8\_22}, \epfmt{arxiv}{1301.3662}]
+
+\bibitem{Fey82}\bibhead{Fey82}
+{\sc Richard~P. Feynman}: Simulating physics with computers.
+\newblock {\em Internat. J. Theoretical Physics}, 21(6-7):467--488, 1982.
+\newblock [\epfmtdoi{10.1007/BF02650179}]
+
+\bibitem{FBS+14}\bibhead{FBS+14}
+{\sc Kent~A.{\,}G. Fisher, Anne Broadbent, Lynden~K. Shalm, Zhennya Yan,
+  Jonathan Lavoie, Robert Prevedel, Thomas Jennewein, and Kevin~J. Resch}:
+  Quantum computing on encrypted data.
+\newblock {\em Nature Communications}, 5:3074, 2014.
+\newblock [\epfmtdoi{10.1038/ncomms4074}, \epfmt{arxiv}{1309.2586}]
+
+\bibitem{FH15}\bibhead{FH15}
+{\sc Joseph~F. Fitzsimons and Michal Hajdu{\v{s}}ek}: Post hoc verification of
+  quantum computation, 2015.
+\newblock [\epfmt{arxiv}{1512.04375}]
+
+\bibitem{FK12}\bibhead{FK12}
+{\sc Joseph~F. Fitzsimons and Elham Kashefi}: Unconditionally verifiable blind
+  computation, 2012.
+\newblock [\epfmt{arxiv}{1203.5217}]
+
+\bibitem{FK17}\bibhead{FK17}
+{\sc Joseph~F. Fitzsimons and Elham Kashefi}: Unconditionally verifiable blind
+  quantum computation.
+\newblock {\em Phys. Rev. A}, 96(1):012303, 2017.
+\newblock [\epfmtdoi{10.1103/PhysRevA.96.012303}]
+
+\bibitem{GH05}\bibhead{GH05}
+{\sc Zhengting Gan and Robert~J. Harrison}: Calibrating quantum chemistry: A
+  multi-teraflop, parallel-vector, full-configuration interaction program for
+  the {Cray-X1}.
+\newblock In {\em 18th Ann. Conf. on Supercomputing (SC'05)}, pp. 22--22, 2005.
+\newblock [\epfmtdoi{10.1109/SC.2005.17}]
+
+\bibitem{GKAE13}\bibhead{GKAE13}
+{\sc Christian Gogolin, Martin Kliesch, Leandro Aolita, and Jens Eisert}:
+  Boson-{S}ampling in the light of sample complexity, 2013.
+\newblock [\epfmt{arxiv}{1306.3995}]
+
+\bibitem{GKR08}\bibhead{GKR08}
+{\sc Shafi Goldwasser, Yael~Tauman Kalai, and Guy~N. Rothblum}: Delegating
+  computation: {I}nteractive proofs for muggles.
+\newblock {\em J. ACM}, 62(4):27:1--27:64, 2015.
+\newblock Preliminary version in
+  \href{http://doi.org/10.1145/1374376.1374396}{STOC'08}.
+\newblock [\epfmtdoi{10.1145/2699436}, \epfmt{eccc}{TR17-108}]
+
+\bibitem{GMR89}\bibhead{GMR89}
+{\sc Shafi Goldwasser, Silvio Micali, and Charles Rackoff}: The knowledge
+  complexity of interactive proof systems.
+\newblock {\em SIAM J. Comput.}, 18(1):186--208, 1989.
+\newblock Preliminary version in
+  \href{http://doi.org/10.1145/22145.22178}{STOC'85}.
+\newblock [\epfmtdoi{10.1137/0218012}]
+
+\bibitem{GC99}\bibhead{GC99}
+{\sc Daniel Gottesman and Isaac~L. Chuang}: Demonstrating the viability of
+  universal quantum computation using teleportation and single-qubit
+  operations.
+\newblock {\em Nature}, 402(6760):390--393, 1999.
+\newblock [\epfmtdoi{10.1038/46503}, \epfmt{arxiv}{quant-ph/9908010}]
+
+\bibitem{HH16}\bibhead{HH16}
+{\sc Masahito Hayashi and Michal Hajdu{\v{s}}ek}: Self-guaranteed
+  measurement-based quantum computation, 2016.
+\newblock [\epfmt{arxiv}{1603.02195}]
+
+\bibitem{HM15}\bibhead{HM15}
+{\sc Masahito Hayashi and Tomoyuki Morimae}: Verifiable measurement-only blind
+  quantum computing with stabilizer testing.
+\newblock {\em Phys. Rev. Lett.}, 115(22):220502, 2015.
+\newblock [\epfmtdoi{10.1103/PhysRevLett.115.220502},
+  \epfmt{arxiv}{1505.07535}]
+
+\bibitem{JJUW10}\bibhead{JJUW10}
+{\sc Rahul Jain, Zhengfeng Ji, Sarvagya Upadhyay, and John Watrous}: {\sf QIP =
+  PSPACE}.
+\newblock {\em Comm. ACM}, 53(12):102--109, 2010.
+\newblock Preliminary version in
+  \href{http://doi.org/10.1145/1806689.1806768}{STOC'10}.
+\newblock [\epfmtdoi{10.1145/1859204.1859231}, \epfmt{arxiv}{0907.4737}]
+
+\bibitem{KDK15}\bibhead{KDK15}
+{\sc Theodoros Kapourniotis, Vedran Dunjko, and Elham Kashefi}: On optimising
+  quantum communications in verifiable quantum computing.
+\newblock In {\em Asian Quantum Info. Sci. Conf. (AQIS'15)}, pp. 23--25, 2015.
+\newblock [\epfmt{arxiv}{1506.06943}]
+
+\bibitem{KW15}\bibhead{KW15}
+{\sc Elham Kashefi and Petros Wallden}: Optimised resource construction for
+  verifiable quantum computation.
+\newblock {\em J. Physics A}, 50(14):145306, 2017.
+\newblock [\epfmtdoi{10.1088/1751-8121/aa5dac}, \epfmt{arxiv}{1510.07408}]
+
+\bibitem{KKMV08}\bibhead{KKMV08}
+{\sc Julia Kempe, Hirotada Kobayashi, Keiji Matsumoto, and Thomas Vidick}:
+  Using entanglement in quantum multi-prover interactive proofs.
+\newblock {\em Comput. Complexity}, 18(2):273--307, 2009.
+\newblock Preliminary version in
+  \href{http://doi.org/10.1109/CCC.2008.6}{CCC'08}.
+\newblock [\epfmtdoi{10.1007/s00037-009-0275-3}, \epfmt{arxiv}{0711.3715}]
+
+\bibitem{LFKN90}\bibhead{LFKN90}
+{\sc Carsten Lund, Lance Fortnow, Howard Karloff, and Noam Nisan}: Algebraic
+  methods for interactive proof systems.
+\newblock {\em J. ACM}, 39(4):859--868, 1992.
+\newblock Preliminary version in
+  \href{http://doi.org/10.1109/FSCS.1990.89518}{FOCS'90}.
+\newblock [\epfmtdoi{10.1145/146585.146605}]
+
+\bibitem{NC00}\bibhead{NC00}
+{\sc Michael~A. Nielsen and Issac~L. Chuang}: {\em Quantum Computation and
+  Quantum Information}.
+\newblock Cambridge University Press, 2000.
+\newblock [\epfmtdoi{10.1017/CBO9780511976667}]
+
+\bibitem{RUV13}\bibhead{RUV13}
+{\sc Ben~W. Reichardt, Falk Unger, and Umesh Vazirani}: Classical command of
+  quantum systems.
+\newblock {\em Nature}, 496(7446):456--460, 2013.
+\newblock Preliminary version in
+  \href{http://doi.org/10.1145/2422436.2422473}{ITCS'13}.
+\newblock [\epfmtdoi{10.1038/nature12035}, \epfmt{arxiv}{1209.0448},
+  \epfmt{arxiv}{1209.0449}]
+
+\bibitem{Sha92}\bibhead{Sha92}
+{\sc Adi Shamir}: {\sf IP = PSPACE}.
+\newblock {\em J. ACM}, 39(4):869--877, 1992.
+\newblock Preliminary version in
+  \href{http://doi.org/10.1109/FSCS.1990.89519}{FOCS'90}.
+\newblock [\epfmtdoi{10.1145/146585.146609}]
+
+\bibitem{SP00}\bibhead{SP00}
+{\sc Peter~W. Shor and John Preskill}: Simple proof of security of the {BB}84
+  quantum key distribution protocol.
+\newblock {\em Phys. Rev. Lett.}, 85(2):441--444, 2000.
+\newblock [\epfmtdoi{10.1103/physrevlett.85.441},
+  \epfmt{arxiv}{quant-ph/0003004}]
+
+\bibitem{SVB+14}\bibhead{SVB+14}
+{\sc Nicol{\`o} Spagnolo, Chiara Vitelli, Marco Bentivegna, Daniel~J Brod,
+  Andrea Crespi, Fulvio Flamini, Sandro Giacomini, Giorgio Milani, Roberta
+  Ramponi, Paolo Mataloni, Roberto Osellame, Ernesto~F. Galv{\~a}o, and Fabio
+  Sciarrino}: Experimental validation of photonic boson sampling.
+\newblock {\em Nature Photonics}, 8(8):615--620, 2014.
+\newblock [\epfmtdoi{10.1038/nphoton.2014.135}, \epfmt{arxiv}{1311.1622}]
+
+\bibitem{Wat03}\bibhead{Wat03}
+{\sc John Watrous}: {\sf PSPACE} has constant-round quantum interactive proof
+  systems.
+\newblock {\em Theoret. Comput. Sci.}, 292(3):575--588, 2003.
+\newblock Preliminary version in
+  \href{http://doi.org/10.1109/SFFCS.1999.814583}{FOCS'99}.
+\newblock [\epfmtdoi{10.1016/S0304-3975(01)00375-9}, \epfmt{arxiv}{cs/9901015}]
+
+\bibitem{ZLC00}\bibhead{ZLC00}
+{\sc Xinlan Zhou, Debbie~W. Leung, and Isaac~L. Chuang}: Methodology for
+  quantum logic gate construction.
+\newblock {\em Phys. Rev. A}, 62(5):052316, 2000.
+\newblock [\epfmtdoi{10.1103/PhysRevA.62.052316},
+  \epfmt{arxiv}{quant-ph/0002039}]
+
+\end{thebibliography}

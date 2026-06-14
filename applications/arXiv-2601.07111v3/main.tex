@@ -1,0 +1,268 @@
+\documentclass[a4paper]{article}
+
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{subcaption}
+\usepackage{amsmath, amssymb, physics, amsthm, mathtools, dsfont}
+\usepackage{multicol}
+\usepackage{multirow}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{wrapfig}
+\usepackage{etoolbox}
+\usepackage{authblk}
+
+\usepackage{todonotes}
+\todostyle{holl}{color=green!30, size=\footnotesize}
+\todostyle{sas}{color=red!30, size=\footnotesize}
+
+\usepackage[inline]{enumitem}
+\geometry{hmargin={3cm},vmargin=2cm, marginparwidth=4.5cm}
+
+\usepackage{tabularx}
+
+\usepackage{framed}
+\renewenvironment{leftbar}[1][\hsize]
+{
+     \def\FrameCommand
+     {
+         {\color{black}\vrule width 3pt}
+         \hspace{6pt}
+        \fboxsep=\FrameSep \fbox
+     }
+     \MakeFramed{\hsize#1\advance\hsize-\width\FrameRestore}
+}
+{\endMakeFramed}
+
+\newcommand{\sbline}{\\[.3\normalbaselineskip]}
+
+\usepackage{xcolor}
+\definecolor{quantumviolet}{HTML}{53257F}
+\definecolor{quantumgray}{HTML}{555555}
+\hypersetup{
+    colorlinks,
+    citecolor=magenta,
+    linkcolor=cyan,
+    urlcolor=magenta
+    }
+
+\providetoggle{darkmode}
+\settoggle{darkmode}{false}
+\iftoggle{darkmode}{
+    \pagecolor{darkbackground}
+    \color{white}
+    \hypersetup{
+    colorlinks,
+    citecolor=Red,
+    linkcolor=Red,
+    urlcolor=Red
+    }
+}
+
+\usepackage{hyperref}
+\usepackage{cleveref}
+
+\newcommand{\Acc}{\mathsf{Acc}}
+\newcommand{\Rej}{\mathsf{Rej}}
+\newcommand{\Wrong}{\mathsf{Wrong}}
+\newcommand{\TrapsCheck}{\mathsf{TrapsCheck}}
+\newcommand{\MajVote}{\mathsf{MajVote}}
+
+\renewcommand{\b}{\mathbf b}
+\renewcommand{\a}{\mathbf a}
+\renewcommand{\r}{\mathbf r}
+\renewcommand{\c}{\mathtt{cheat}}
+\newcommand{\z}{\mathbf z}
+\newcommand{\x}{\mathbf x}
+\newcommand{\rate}{r}
+
+\newcommand{\Q}{\mathsf Q}
+\newcommand{\I}{\mathds{1}}
+\newcommand{\X}{\mathsf{X}}
+\newcommand{\Y}{\mathsf{Y}}
+\newcommand{\Z}{\mathsf{Z}}
+\newcommand{\E}{\mathsf{E}}
+\newcommand{\Pauli}{\mathcal{P}}
+\renewcommand{\P}{\mathsf{P}}
+\newcommand{\Clifford}{\mathcal{C}}
+\newcommand{\Enc}[2]{\X^{#1}\Z^{#2}}
+\newcommand{\Dec}[2]{\Z^{#2}\X^{#1}}
+
+\newcommand{\naturals}{\mathbb N}
+
+\newcommand{\A}{\mathtt{A}}
+\newcommand{\Alabel}{\A}
+\newcommand{\Tlabel}{\mathtt{T}}
+\newcommand{\Xlabel}{\mathtt{X}}
+\newcommand{\Ylabel}{\mathtt{Y}}
+\newcommand{\Zlabel}{\mathtt{Z}}
+\newcommand{\Plabel}{\mathtt{P}}
+\newcommand{\C}{\mathsf{C}}
+\newcommand{\resetcptp}[1]{\mathsf{Reset}_{\ket{#1}}}
+\newcommand{\Apattern}{\A}
+\newcommand{\PCor}{\mathsf{PCor}}
+\newcommand{\class}{\mathfrak C}
+\newcommand{\classA}{\mathcal A}
+\newcommand{\BQP}{\textsf{BQP}}
+\newcommand{\YES}{\textsf{YES}}
+\newcommand{\NO}{\textsf{NO}}
+\newcommand{\QCircuit}{\textsf{QCircuit}}
+\newcommand{\bqp}{c}
+\newcommand{\F}{\mathsf{F}}
+\newcommand{\D}{\mathsf{D}}
+\newcommand{\G}{\mathsf{G}}
+
+\renewcommand{\H}{\mathsf{H}}
+\newcommand{\CZ}{\mathsf{CZ}}
+\newcommand{\CNOT}{\mathsf{CNOT}}
+\newcommand{\SWAP}{\mathsf{SWAP}}
+\newcommand{\U}{\mathsf{U}}
+\newcommand{\T}{\mathsf{T}}
+\newcommand{\CR}{\mathsf{CR}}
+\newcommand{\stab}{\hat{\mathcal{S}}}
+\newcommand{\rtab}{\hat{\mathcal{R}}}
+\newcommand{\id}{\mathds{1}}
+
+\newcommand{\QOTP}{\textsf{Q-OTP}}
+\newcommand{\Resource}{\mathcal R}
+\newcommand{\Simulator}{\mathcal S}
+\newcommand{\Protocol}{\pi}
+\newcommand{\filter}{\vdash}
+\newcommand{\qchannel}{\mathcal Q}
+
+\newcommand{\compatible}{\mathrel{\perp\!\!\!\perp}}
+\newcommand{\qwc}{\odot}
+\newcommand{\perm}{\sigma}
+
+\usepackage{thmtools}
+\theoremstyle{plain}
+
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{property}{Property}
+\newtheorem{corollary}{Corollary}
+\newtheorem{lemma}{Lemma}
+\newtheorem{remark}{Remark}
+
+\newtheoremstyle{upright}
+  {10pt}{10pt}
+  {\normalfont}
+  {}
+  {\bfseries}
+  {}
+  {0.5em}
+  {
+    \rule{\linewidth}{0.4pt}\\%
+    \thmname{#1}\thmnumber{ #2}\thmnote{ (#3)}\\%
+    \rule[1.3ex]{\linewidth}{0.4pt}
+  }
+\theoremstyle{upright}
+\newtheorem{protocol}{Protocol}
+\newtheorem{resource}{Resource}
+\newtheorem{simulator}{Simulator}
+
+\let\oldprotocol\protocol
+\let\endoldprotocol\endprotocol
+
+\let\oldresource\resource
+\let\endoldresource\endresource
+
+\let\oldsimulator\simulator
+\let\endoldsimulator\endsimulator
+
+\renewenvironment{protocol}
+  {\oldprotocol}
+  {\par\hrule\endoldprotocol}
+
+\renewenvironment{resource}
+  {\oldresource}
+  {\par\hrule\endoldresource}
+
+\renewenvironment{simulator}
+  {\oldsimulator}
+  {\par\hrule\endoldsimulator}
+
+\usepackage [
+n,
+advantage,
+operators,
+sets,
+adversary,
+landau,
+probability,
+notions,
+logic,
+ff,
+mm,
+primitives,
+events,
+complexity,
+asymptotics,
+keys
+] {cryptocode}
+
+\newcommand{\cmp}[1]{\complclass{#1}}
+\renewcommand{\poly}{\mathrm{poly}}
+
+\usepackage{algpseudocodex}
+\algrenewcommand\algorithmicprocedure{$\triangleright$}
+
+\usepackage{float}
+\floatstyle{ruled}
+\newfloat{resourcee}{htb!}{idf}
+\floatname{resourcee}{Resource}
+\newcommand{\cptp}[1]{\mathsf{#1}}
+
+\newfloat{simulatorr}{htb!}{idf}
+\floatname{simulatorr}{Simulator}
+
+\newfloat{protocoll}{htb!}{idf}
+\floatname{protocoll}{Protocol}
+
+\newfloat{informalprotocol}{htb!}{idf}
+\floatname{informalprotocol}{Informal Protocol}
+
+\newfloat{informalresource}{htb!}{idf}
+\floatname{informalresource}{Informal Resource}
+\newfloat{reduction}{htb!}{idf}
+\floatname{reduction}{Reduction}
+
+\newfloat{routine}{htb!}{idf}
+\floatname{routine}{Routine}
+
+\newfloat{algo}{htb!}{idf}
+
+\title{Composable Verification in the Circuit-Model via Magic-Blindness}
+
+\author[]{Sami Abdul Sater, Harold Ollivier} \affil[]{DI-ENS, Ecole Normale Supérieure (Université PSL, CNRS, INRIA), \\
+  45 rue d’Ulm, Paris 75005, France.}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+  As quantum computing machines move towards the utility regime, it is essential that users are able to verify their delegated quantum computations with security guarantees that are (i) robust to noise (ii) composable with other secure protocols and (iii) exponentially stronger as the number of resources dedicated to security increases. Previous works that achieve these guarantees are expressed in the Measurement-Based Quantum Computation (MBQC) model and benefit from a modular framework of verification protocols. This leaves architectures based on the circuit-model---in particular those using the Magic State Injection (MSI)---with fewer options to verify their computations or with the need to compile their circuits in MBQC which leads to overheads.
+
+    This paper introduces a family of noise robust, composable and efficient verification protocols for Clifford + MSI circuits that are secure against arbitrary malicious behavior. This family contains the verification protocol of Broadbent (2018, ToC), extends its security guarantees while also bridging the modularity gap between protocols for MBQC and those for the circuit-model, and reducing quantum communication costs. As a result, it opens the prospect of rapid implementation tailored to near-term quantum devices.
+
+    Our technique is based on a refined notion of blindness, called magic-blindness, which hides only the injected magic states---the sole source of non-Clifford computational power. This enables verification by randomly interleaving computation rounds with classically simulable, magic-free test rounds, leading to a trap-based framework for circuit verification. As a result, circuit-based quantum verification attains the same level of security and robustness previously known only in MBQC. It also reduces the quantum communication cost as transmitted qubits are required only at the locations of state injection.
+
+  \end{abstract}
+
+\input{sec-intro.tex}
+\input{sec-prelims.tex}
+\input{sec-blindness.tex}
+\input{sec-verif.tex}
+\input{sec-discussion.tex}
+
+\paragraph{Acknowledgements}
+Authors acknowledge Elham Kashefi, Dominik Leichtle, and Luka Music for fruitful discussions throughout the work, and Rajarsi Pal for pointing out the link between optimal traps merging procedures and graph coloring. Authors acknowledge funding from the Hybrid Quantum Initiative (HQI) supported by France 2030 under ANR grant ANR-22-PNCQ-0002.
+
+\bibliography{qubib.bib} \bibliographystyle{linksen-sorted}
+
+\appendix
+
+\input{app-blindness.tex}
+\input{app-verification-v2.tex}
+
+\end{document}

@@ -1,0 +1,65 @@
+{
+  "ceiling_two_axis": 0.5,
+  "rows": [
+    {
+      "config": "path9: independent {0,2,4,6,8}",
+      "n_noisy": 5,
+      "independent": true,
+      "rates": {
+        "single-axis (X)": 1.0,
+        "single-axis (Y)": 1.0,
+        "two-axis (X,Y)": 0.7727
+      }
+    },
+    {
+      "config": "path9: connected {0,1,2,3}",
+      "n_noisy": 4,
+      "independent": false,
+      "rates": {
+        "single-axis (X)": 1.0,
+        "single-axis (Y)": 1.0,
+        "two-axis (X,Y)": 0.75
+      }
+    },
+    {
+      "config": "C5: all (odd cycle)",
+      "n_noisy": 5,
+      "independent": false,
+      "rates": {
+        "single-axis (X)": 0.8,
+        "single-axis (Y)": 0.8,
+        "two-axis (X,Y)": 0.6
+      }
+    },
+    {
+      "config": "star6: leaves (independent)",
+      "n_noisy": 6,
+      "independent": true,
+      "rates": {
+        "single-axis (X)": 1.0,
+        "single-axis (Y)": 1.0,
+        "two-axis (X,Y)": 1.0
+      }
+    },
+    {
+      "config": "brickwork: independent (colour class)",
+      "n_noisy": 15,
+      "independent": true,
+      "rates": {
+        "single-axis (X)": 1.0,
+        "single-axis (Y)": 1.0,
+        "two-axis (X,Y)": 0.75
+      }
+    },
+    {
+      "config": "brickwork: connected blob",
+      "n_noisy": 15,
+      "independent": false,
+      "rates": {
+        "single-axis (X)": 0.875,
+        "single-axis (Y)": 0.875,
+        "two-axis (X,Y)": 0.65
+      }
+    }
+  ]
+}

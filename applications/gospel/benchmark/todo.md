@@ -1,0 +1,5 @@
+- faire du profiling: pourquoi depolarizing c'est chaud ?
+- faire le calcul sur Stim, parce que c'est du bruit dépolarisant
+- si on connait le bruit, on peut eliminer la couche blindness, donc tout est Clifford, donc on peut avoir des simulations hyper poussées grace a stim, seulement par principe d'illustration. Les chiffres qu'on sortira sont bons, juste faut être honnête
+- on vire les rotations, mais le bruit associé reste là, c'est a dire le bruit depolarisant apres rotation, il reste là!
+  - au pire ça double l'angle et ça restera clifford

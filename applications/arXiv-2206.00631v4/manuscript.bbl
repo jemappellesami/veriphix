@@ -1,0 +1,168 @@
+\providecommand{\newblock}{}
+\begin{thebibliography}{10}
+\expandafter\ifx\csname url\endcsname\relax
+  \def\url#1{{\tt #1}}\fi
+\expandafter\ifx\csname urlprefix\endcsname\relax\def\urlprefix{URL }\fi
+\providecommand{\eprint}[2][]{\url{#2}}
+% Bibliography created with iopart-num v2.1
+% /biblio/bibtex/contrib/iopart-num
+
+\bibitem{G09:fully}
+Gentry C 2009 Fully homomorphic encryption using ideal lattices {\em
+  Proceedings of the forty-first annual ACM symposium on Theory of computing\/}
+  pp 169--178
+
+\bibitem{G17:verifiable}
+Gennaro R 2017 Verifiable outsourced computation: A survey {\em Proceedings of
+  the ACM Symposium on Principles of Distributed Computing\/} pp 313--313
+
+\bibitem{G04:conference}
+Gottesman D 2004 Conference as reported in~\cite{ABE10:interactive}
+
+\bibitem{A07:scott}
+Aaronson S 2007 {T}he {S}cott {A}aronson 25.00\$ {P}rize
+  \url{http://www.scottaaronson.com/blog/?p=284} accessed: Jan. 30 2015
+
+\bibitem{V07:conference}
+Vazirani U 2007 Conference reported in~\cite{ABE10:interactive}
+
+\bibitem{AV12:is}
+Aharonov D and Vazirani U 2012 Is quantum mechanics falsifiable? a
+  computational perspective on the foundations of quantum mechanics
+  eprint:\href{http://arxiv.org/abs/1206.3686}{arXiv:1206.3686}
+
+\bibitem{ABE10:interactive}
+Aharonov D, Ben-Or M and Eban E 2010 Interactive proofs for quantum computation
+  {\em Proceedings of Innovations of Computer Science (ICS 2010)\/} p 453–469
+
+\bibitem{ABEM17:interactive}
+Aharonov D, Ben-Or M, Eban E and Mahadev U 2017 {\em arxiv:1704.04487\/}
+  Updated and corrected version of arxiv:0810.5375
+  \urlprefix\url{https://arxiv.org/pdf/1704.04487}
+
+\bibitem{FK17:unconditionally}
+Fitzsimons J~F and Kashefi E 2017 {\em Phys. Rev. A\/} {\bf 96}(1) 012303
+  \urlprefix\url{https://link.aps.org/doi/10.1103/PhysRevA.96.012303}
+
+\bibitem{B15:how}
+Broadbent A 2018 {\em Theory of Computing\/} {\bf 14} 1--37
+  \urlprefix\url{https://theoryofcomputing.org/articles/v014a011}
+
+\bibitem{HM15:verifiable}
+Hayashi M and Morimae T 2015 {\em Phys. Rev. Lett.\/} {\bf 115}(22) 220502
+  \urlprefix\url{https://link.aps.org/doi/10.1103/PhysRevLett.115.220502}
+
+\bibitem{FHM18:post}
+Fitzsimons J~F, Hajdu\ifmmode~\check{s}\else \v{s}\fi{}ek M and Morimae T 2018
+  {\em Phys. Rev. Lett.\/} {\bf 120}(4) 040501
+  \urlprefix\url{https://link.aps.org/doi/10.1103/PhysRevLett.120.040501}
+
+\bibitem{HKSE17:direct}
+Hangleiter D, Kliesch M, Schwarz M and Eisert J 2017 {\em Quantum Science and
+  Technology\/} {\bf 2} 015004
+  \urlprefix\url{https://doi.org/10.1088/2058-9565/2/1/015004}
+
+\bibitem{M18:classical}
+Mahadev U 2018 Classical verification of quantum computations {\em 59th {IEEE}
+  Annual Symposium on Foundations of Computer Science, {FOCS} 2018, Paris,
+  France, October 7-9, 2018\/} ed Thorup M ({IEEE} Computer Society) pp
+  259--267 \urlprefix\url{https://doi.org/10.1109/FOCS.2018.00033}
+
+\bibitem{KDK15:optimising}
+Kapourniotis T, Dunjko V and Kashefi E 2015 On optimising quantum communication
+  in verifiable quantum computing presented at AQIS'15 conference
+
+\bibitem{Z21:succinct}
+Zhang J 2021 Succinct blind quantum computation using a random oracle {\em STOC
+  2021: Proceedings of the 53rd Annual ACM SIGACT Symposium on Theory of
+  Computing\/}
+
+\bibitem{KW17:optimised}
+Kashefi E and Wallden P 2017 {\em Journal of Physics A: Mathematical and
+  Theoretical; preprint arXiv:1510.07408\/}
+  \urlprefix\url{http://iopscience.iop.org/10.1088/1751-8121/aa5dac}
+
+\bibitem{XTH20:improved}
+Xu Q, Tan X and Huang R 2020 {\em Entropy\/} {\bf 22} ISSN 1099-4300
+  \urlprefix\url{https://www.mdpi.com/1099-4300/22/9/996}
+
+\bibitem{LMKO21:verifying}
+Leichtle D, Music L, Kashefi E and Ollivier H 2021 {\em Phys. Rev. X Quantum\/}
+  {\bf 2}
+
+\bibitem{FKD18:reducing}
+Ferracin S, Kapourniotis T and Datta A 2018 {\em Physical Review A\/} {\bf 98}
+  022323
+
+\bibitem{WEP22:equivalence}
+Wiesner F, Eisert J and Pappa A 2022 Equivalence in delegated quantum computing
+  \urlprefix\url{https://arxiv.org/abs/2206.07469}
+
+\bibitem{MR11:abstract-cryptography}
+Maurer U and Renner R 2011 Abstract cryptography {\em Innovations in Computer
+  Science\/} (Tsinghua University Press) pp 1 -- 21 ISBN 978-7-302-24517-9
+  \urlprefix\url{https://crypto.ethz.ch/publications/files/MauRen11.pdf}
+
+\bibitem{DFPR14:composable}
+Dunjko V, Fitzsimons J~F, Portmann C and Renner R 2014 Composable security of
+  delegated quantum computation {\em Advances in Cryptology -- ASIACRYPT
+  2014\/} ed Sarkar P and Iwata T (Berlin, Heidelberg: Springer Berlin
+  Heidelberg) pp 406--425 ISBN 978-3-662-45608-8
+
+\bibitem{KKLM+23:quantum}
+Kapourniotis T, Kashefi E, Leichtle D, Music L and Ollivier H 2023 Asymmetric
+  quantum secure multi-party computation with weak clients against dishonest
+  majority Cryptology ePrint Archive, Paper 2023/379
+  \urlprefix\url{https://eprint.iacr.org/2023/379}
+
+\bibitem{RB01:one}
+Raussendorf R and Briegel H~J 2001 {\em Phys. Rev. Lett.\/} {\bf 86}(22)
+  5188--5191
+  \urlprefix\url{http://link.aps.org/doi/10.1103/PhysRevLett.86.5188}
+
+\bibitem{DKP07:measurement-calculus}
+Danos V, Kashefi E and Panangaden P 2007 {\em J. ACM\/} {\bf 54} ISSN 0004-5411
+  \urlprefix\url{https://arxiv.org/pdf/0704.1263.pdf}
+
+\bibitem{HEB04:multiparty}
+Hein M, Eisert J and Briegel H~J 2004 {\em Phys. Rev. A\/} {\bf 69}(6) 062311
+  \urlprefix\url{https://link.aps.org/doi/10.1103/PhysRevA.69.062311}
+
+\bibitem{DK06:determinism}
+Danos V and Kashefi E 2006 {\em Phys. Rev. A\/} {\bf 74}(5) 052310
+  \urlprefix\url{http://link.aps.org/doi/10.1103/PhysRevA.74.052310}
+
+\bibitem{BFK09:universal}
+Broadbent A, Fitzsimons J and Kashefi E 2009 Universal blind quantum
+  computation {\em 50th Annual IEEE Symposium on Foundations of Computer
+  Science\/} ed IEEE
+
+\bibitem{M12:constructive-cryptography}
+Maurer U 2012 Constructive cryptography -- a new paradigm for security
+  definitions and proofs {\em Theory of Security and Applications\/} ed
+  M{\"o}dersheim S and Palamidessi C (Berlin, Heidelberg: Springer Berlin
+  Heidelberg) pp 33--56 ISBN 978-3-642-27375-9
+
+\bibitem{RHG07:topological}
+Raussendorf R, Harrington J and Goyal K 2007 {\em New Journal of Physics\/}
+
+\bibitem{K16:efficient}
+Kapourniotis T 2016 {\em Efficient verification of universal and intermediate
+  quantum computing\/} Ph.D. thesis School of Informatics University of
+  Edinburgh
+
+\bibitem{B21:secure}
+Bartusek J 2021 Secure quantum computation with classical communication {\em
+  Theory of Cryptography\/} ed Nissim K and Waters B (Cham: Springer
+  International Publishing) pp 1--30 ISBN 978-3-030-90459-3
+
+\bibitem{ACGH20:non}
+Alagic G, Childs A~M, Grilo A~B and Hung S~H 2020 Non-interactive classical
+  verification of quantum computation {\em Theory of Cryptography. TCC 2020\/}
+  ({\em Lecture Notes in Computer Science\/} vol 12552) ed R P and K P
+
+\bibitem{M13:interactive}
+McKague M 2016 {\em Theory of Computing\/} {\bf 12} 1--42
+  \urlprefix\url{https://theoryofcomputing.org/articles/v012a003}
+
+\end{thebibliography}

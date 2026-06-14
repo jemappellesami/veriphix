@@ -1,0 +1,96 @@
+\section{Introduction}
+\subsection{Motivation}
+% \todo[holl]{
+% \\ - Verification is necessary to establish trust 
+% \\ - It is getting closer to practical realization because of noise robustness (+ lighter primitives / adaptations to more realistic scenarios)
+% \\ - But it remains clostly even if very attractive overhead compared to other proposed solutions
+% \\ - We want to do more stuff with the test rounds
+% \\ - And quatum computers also require recallibration
+% \\ - Why not optimizing both at once?
+% \\ - Related to this, in some situations, such as error mitigation that need characterized devices, one would want to ensure that the noise model accurately describes reality.}
+
+As quantum devices continue to advance, clients with limited quantum capabilities are increasingly dependent on remote, potentially untrusted servers to perform complex computations. At the same time, because quantum computing holds the promise of solving problems beyond the reach of classical machines, it is therefore crucial to ensure the correctness of computations delegated to these servers. However, this task becomes particularly challenging when the problem lies outside the class $\mathsf{NP}$, yet is efficiently solvable by a quantum machine, in such a case clients cannot cross-check the results using classical computers.
+
+This challenge has been explored from a theoretical perspective, notably through the introduction of Quantum Prover Interactive Proof systems~\cite{ABE10interactive, ABEM17interactive}. Since then, various protocols have been proposed to enable the verification of quantum computations, particularly those solvable in the class $\mathsf{BQP}$, via interactive means. Some approaches, such as those in~\cite{ABE10interactive, ABEM17interactive}, rely on quantum authentication schemes, while others~\cite{FK17unconditionally} leverage Measurement-Based Quantum Computing (MBQC) to design protocols that allow clients to probe the honesty of the server. Both approaches offer information-theoretic security, though they necessitate quantum communication. A different approach was proposed in~\cite{M18classical} which relaxes this requirement, but the provided security relies on computational hardness assumptions.
+
+Recent protocols~\cite{B18how, broadbent2025noiserobustnessdelegatedquantumcomputation, LMKO21verifying, KKLM22unifying} have advanced the former approach, incorporating multiple rounds of interaction, some dedicated to computation and others to testing the server's behavior. This paradigm, termed \emph{Compute and Test}, is particularly suited for near-term quantum devices. It avoids the space overhead associated with earlier approaches by shifting it to repeating computation and testing rounds. However, even with a repetition count growing as $O(\log(1/\epsilon))$, where $\epsilon$ is the distinguishing probability between the ideal device and the real protocol, the burden of repeated rounds remains significant, and further reductions are desirable.
+
+From the server’s perspective, verification protocols not only enforce honesty but also demand precise quantum control to ensure that instructions are executed faithfully. Any failure to do so could raise suspicions about the correctness of the computation. Practically, this necessitates constant monitoring and calibration. Since calibration processes are typically separate from the computation itself, servers must periodically go offline to perform these checks, introducing additional overhead. 
+
+The central question we address in this paper is whether it is possible to reduce this offline time by using test round data, collected by the client, to assist in the server's calibration process. We demonstrate that this is indeed possible by building on the idea presented in~\cite{KKLM22unifying}, in the \emph{Compute and Test} paradigm, verification relies on error detection, which can be leveraged to infer errors. In our case, this enables device characterization, providing a pathway to reduce calibration downtime while maintaining protocol security.
+
+\subsection{Related Work}
+% \todo[holl]{
+% \\ - Verification works quite well in the MBQC picture where a computation is driven...
+% \\ - The paradigm that we rely on for verification is compute and test at random and blindly.
+% \\ - This offers the possibility to have noise robustness.
+% \\ - An important element from the security proof is that we can show that the effective noise has been twirled when we look at what happens on a fixed branch (so no conditional updates)
+% \\ - Here is why it is costly, but thanks to composability, we can safely recycle the test rounds.}
+
+\paragraph{Verification.}
+This work relies on using the protocol introduced in~\cite{LMKO21verifying} as \emph{robust Verifiable Blind Quantum Computing} (rVBQC) \cite{BFK09universal}. It follows the Compute and Test paradigm by randomly interleaving computation and test rounds while delegating their execution to the server through \emph{Universal Blind Quantum Computing} (UBQC). This guarantees that both types of rounds are indistinguishable from one another.
+
+More precisely, in the simplest scenario, the client will run the protocol using $N$ rounds, using randomly half of them for the computation and the other half for the tests. The candidate result of the computation is obtained by aggregating the outcomes of all the computation rounds and taking the majority vote. One can then remark that because $\mathsf{BQP}$ instances have a correctness-soundness gap, to corrupt the candidate result, the server must attack successfully and cause a bit-flip for a number of computation rounds that grows linearly in $N$.
+
+Regarding the tests, they are chosen in such a way that they correspond to Clifford computations whose execution yields a deterministic outcome for some final measurement. Because they are run encoded, the server does not know the value of the outcome that is expected by the client, allowing the latter to check the honesty of the former. Indeed, whenever the received outcome does not correspond to the expected one, the client can be sure that the server has not been implementing the given instructions faithfully, thereby detecting a possible attack.
+
+The security proof then works by assessing how likely it is to attack enough computation rounds to cause a flip of the result while being undetected. Equivalently, it determines the probability of successfully flipping the result of the candidate computation when fewer than a given maximum tolerated number of test rounds failed. Computing these probabilities explicitly shows that whenever the maximum tolerated number of failed test rounds is below a threshold value that depends on the correctness-soundness gap, this probability becomes exponentially small in $N$. As a consequence, it is safe to accept the candidate result when the observed number of failed test rounds is below the maximum tolerated value.
+
+This protocol and its security guarantees are detailed in \cref{sec:verification}. Compared to other works such as~\cite{ABE10interactive, ABEM17interactive, B18how} or those stemming directly from~\cite{FK17unconditionally}, such as~\cite{KW17optimised}, it combines several appealing properties:
+\begin{enumerate}
+\item It is composable, meaning that it can be used in a wider context without having to reprove its security in this wider context;
+\item It is efficient as the overhead grows only as \(\log(1/\epsilon)\) for \(\epsilon\) the desired security error;
+\item It is scalable in the sense that the overhead measured by the number of rounds is independent of the size of the computation; and
+\item It is robust meaning that as long as the noise is gentle enough so as not to cause too many failed test rounds, the protocol will accept with high probability. 
+\end{enumerate}   
+
+\paragraph{Noise Characterization.}
+% \todo[holl,inline]{Fix bad notation:
+%   \\- \(C\) should be for the circuit implementing the operator \(\cptp{C}\).
+%   \\- \(\Lambda\) put the circuit as index and the Pauli operator as argument}
+Characterization of quantum devices is an essential task in the process of building quantum machines and very large amount of techniques have been developed to tackle various flavors of the initial question \cite{Wallman2016NoiseTailoringRandomizedCompiling}.
+
+Current techniques can be cast into two broad families. One that works at the component level, while the second works at the system level. More concretely, component-level techniques study a small functionality in isolation. The idea it to fully determine the behavior of the device to improve its behavior. Because the components are generally of modest size, the efficiency of the technique is not too much of a concern. The main limitation of this approach is that it does not give guarantees about the behavior of the component when used in conjunction with other components. For instance, component-level characterization of a 2-qubit gate would not be able to fully anticipate effects such as cross-talk that are inherent to the combination of many components close to one another.
+
+The second family has been precisely developed to characterize the behavior of the full system. There, one will want to keep the arrangement of the components as they are when the system is used, while ensuring some degree of characterization of its behavior. The information extraction task is usually more complex because efficiency becomes a major concern. This is in part because writing a generic process as a CPTP map would require determining an exponential number of a priori independent coefficients. Indeed, system-level techniques overcome this difficulty by assuming that the process has a simpler form---e.g., it is a Pauli channel \cite{Fawzi2023LowerBoundsPauliChannels, Flammia2020EfficientEstimationPauliChannels, Chen2022LearnabilityPauliNoise, Flammia2021PauliErrorEstimationPopulationRecovery, Harper2020EfficientLearningQuantumNoise, Harper2019EfficientLearningGeneralizedPauliChannels, Harper2023LearningCorrelatedNoise39Qubit, Wagner2023LocalityStructuredPauliNoise} and possibly making further assumptions such as Markovianity \cite{rouze2023efficientlearningstructureparameters}.
+
+In this paper, we will be interested in system-level characterization. Randomized benchmarking and its variants have been used to great success in many concrete situations \cite{Franca2018ApproximationRandomizedBenchmarking, Helsen2019SpectralRB, Helsen2022GeneralFrameworkRB, Magesan2012EfficientMeasurementGateError, Heinrich2023RandomizedBenchmarkingRandomQuantumCircuits}. Other approaches include Average Circuit Eigenvalue Sampling (ACES) \cite{Flammia2021AverageCircuitEigenvalueSampling}. This method works specifically for Clifford circuits with Pauli noise. It leverages the following:
+\begin{enumerate}
+\item A single Pauli $\cptp{P}$ operator is transformed by the Clifford operation $\cptp{C}$ into an another single Pauli operator $\cptp{P}'=\cptp{C}[\cptp{P}]$ giving rise to a generalized eigenvalue equation---here associated to eigenvalue 1;
+\item A Pauli operator $\cptp{P}$ is transformed under a Pauli noise channel $\cptp{N}$ into $\cptp{N}[\cptp{P}] = \lambda(\cptp{P}) \cptp{P}$ with $\lambda(\cptp{P}) \in [-1;+1]$;
+\item Generic noise can be transformed into Pauli noise through twirling.
+\end{enumerate}
+Combining these elements, the effect of a noisy Clifford circuit $C$ implementing \(\cptp{C}\) through \(n\) layers \({\cptp{C}}_i\) such that $\cptp{C} = \cptp{C}_n \cptp{C}_{n-1} \ldots \cptp{C}_2 \cptp{C}_1$ is to transform $\cptp{P}$ into
+\begin{equation}
+  \Lambda_{C}(\cptp P) \cptp{C}[\cptp{P}] =
+  \lambda_{C_n}(\cptp{C}_{n-1} \ldots \cptp{C}_1[\cptp{P}])
+  \lambda_{C_{n-1}}(\cptp{C}_{n-2} \ldots \cptp{C}_1[\cptp{P}])  \ldots
+  \lambda_{C_2}(\cptp{C}_1[\cptp{P}])
+  \lambda_{C_1}(\cptp{P}) \cptp{C}[\cptp{P}].\label{eq:aces}
+\end{equation}
+
+With this at hand, the characterization procedure proposed by ACES for a given $\lambda_{\cptp{C}_i}$ works by
+\begin{enumerate}
+\item Constructing circuits comparable to the target circuits where one wants to use the corresponding gate;
+\item Evaluating through observable estimation the value of \(\Lambda_{C}(\cptp{P})\) for various $\cptp{C}$ and $\cptp{P}$ that involve a contribution of \(\lambda_{C_i}\);
+\item Numerically inverting the system of equations to recover an estimate of $\lambda_{C_i}$. 
+\end{enumerate}
+The original paper \cite{Flammia2021AverageCircuitEigenvalueSampling} proposes to solve such a system of equations for several values of $\lambda_{C_i}$ at once by taking their logarithm, which effectively transforms it into a linear system of equations whose coefficients form the \emph{design-matrix}. 
+
+\subsection{Contributions}
+This paper addresses the questions of what information can be extracted from verification protocols about the behavior of the server and how it can be used in practical situations. The interest of this question comes from the apparent gap between what a verification protocol provides, whether the computed result is correct, or the protocol should abort and how verification protocols are designed in the Compute and Test paradigm through the use of error detection codes~\cite{KKLM22unifying}. In essence, verification protocols only output whether the server has been acting honestly or maliciously, while it uses tools that are usually used to infer detailed information about errors and can participate in their correction.
+
+\paragraph{Verification protocols can learn hardware defects once given a possible noise model.}
+It is recognized that the origin of the informational gap lies in the discrepancy between what the client and server are willing to believe. Indeed, the client sees the server as arbitrary and malicious, which is deeply incompatible with extracting a large amount of information. In other words, it is not meaningful to ask about the information gained by the client about the server beyond whether it is honest or not. On the contrary, the server knows whether it is actively malicious or passively noisy. In this latter case, it is meaningful to ask whether the server can learn the parameters of the noise model that it experiences. This is precisely the scenario that we explore in the next sections. A suspicious client that wants to keep being protected against arbitrary deviations from the server, and an honest but noisy server that wants to extract as much information as possible from the verification procedure to update its noise model.
+
+\paragraph{Noise model parameter learning can be made efficient for a large class of noise model and computation graphs.}
+As the setting is now established on firm ground, the question is how to proceed with the information extraction. It is shown in the next section that ACES can be embedded into the verification protocol at no cost. More precisely, a slight change in the verification protocol will modify the execution of the test rounds in a way that keeps their properties intact for verification by the client while also being interpretable as ACES rounds, collecting data to form the design-matrix.
+
+As a result, \cref{proto:vbqc-aces} has the following properties:
+\begin{enumerate}
+\item It constructs Secure Delegated Quantum Computation (\cref{res:sdqc}) with an error negligible in $N$, the number of rounds of the protocol, meaning that it is secure against an arbitrary malicious server;
+\item It is robust to constant circuit-level noise;
+\item It allows an honest-but-noisy server to update parameters of its noise model.
+\end{enumerate}
+
+In practice, \cref{proto:vbqc-aces}, while performing standard verification for the client, informs the server about calibration drifts at no extra cost, thereby reducing the downtime necessary to perform recalibration.

@@ -1,0 +1,11 @@
+{
+  "rates": {
+    "OptimizedTraps (fractional)": 0.4,
+    "FK12 greedy (integer colouring)": 0.3333
+  },
+  "refs": {
+    "1/\u03c7_f(C5) = 2/5": 0.4,
+    "1/\u03c7(C5) = 1/3": 0.3333333333333333,
+    "bipartite ceiling 1/2": 0.5
+  }
+}

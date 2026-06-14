@@ -1,0 +1,291 @@
+\section{Proofs for Verification}
+\label{section: verification proofs}
+
+First, we remind useful tools from probability theory.
+\begin{lemma}[Hoeffding bound for the binomial distribution]
+    \label{lemma:hoeffding:binomial}
+    Let $X\sim \mathrm{Binomial}(n,p)$.
+    For any $k\le np$,
+    \[
+    \Pr[X\le k]
+    \;\le\;
+    \exp\!\left(-\frac{2(np-k)^2}{n}\right),
+    \]
+    and for any $k\ge np$,
+    \[
+    \Pr[X\ge k]
+    \;\le\;
+    \exp\!\left(-\frac{2(np-k)^2}{n}\right).
+    \]
+    \end{lemma}
+
+    \begin{lemma}[Hoeffding bounds for the hypergeometric distribution]
+        \label{lemma:hoeffding:hypergeometric}
+        Let $X \sim \mathrm{Hypergeometric}(N,K,n)$ be the number of marked items when drawing $n$ samples without replacement from a population of size $N$ containing $K$ marked elements.
+        Then $\mathbb{E}[X]=\frac{K}{N}n$.
+        For any $\chi\ge 0$ such that
+        \[
+        \frac{K}{N}-\chi \ge 0
+        \quad\text{and}\quad
+        \frac{K}{N}+\chi \le 1,
+        \]
+        we have
+        \[
+        \Pr\!\left[
+        X \le \Big(\frac{K}{N}-\chi\Big)n
+        \right]
+        \;\le\;
+        \exp(-2\chi^2 n),
+        \]
+        and
+        \[
+        \Pr\!\left[
+        X \ge \Big(\frac{K}{N}+\chi\Big)n
+        \right]
+        \;\le\;
+        \exp(-2\chi^2 n).
+        \]
+        \end{lemma}
+
+Now, we prove the main Lemma useful in the security proof of the Verification protocol, namely Lemma~\ref{lemma:security error}, that we hereby re-state.
+\securityerror*
+
+\begin{proof}
+In the following, we let $\E\in\Pauli_{N\times(n+t)}$ be a fixed Pauli deviation on $N$ rounds, where $N=d+s$, and let $\sigma$ be a partition of $[N]$ drawn uniformly at random.
+Then, we can define the following random variables:
+\begin{itemize}
+    \item $Z$ describing the number of computation rounds affected, meaning the number of $i$ ($\leq d$) yielding a decision bit $\b^{(i)}_1 = y^{(i)}\neq z^\star$ (either by the Server deviation or by inherent failure of the algorithm);
+    \item $Y$ describing the number of failed test rounds, meaning the number of $i$ ($>d$) yielding measurement outcomes $\b^{(i)}$ such that $b^{(i)}_{q_i}\neq0$.
+\end{itemize}
+The statement is thus about bounding the quantity $\max_\E \Pr[Y < w \wedge Z > d/2]$.
+
+\begin{enumerate}[label=\arabic*)]
+    \item
+    In what follows, we will parametrize the Server cheating strategy by the number of rounds on which it decides to act with a non-trivial deviation.
+    We use $\E^{(i)}\in\Pauli_{n+t}$ for the ``per-round Pauli deviation'', meaning such that $\E=\bigotimes_{i\leq N}\E^{(i)}$.
+    \item
+    With this notation, we can parametrize the deviation on the number of rounds on which it is harmful (see Definition \ref{verification:def:harmful}).
+    Let us note $m$ that number. Formally, $$
+    m=
+    \Big|\left\{ i\leq N \; \text{s.t}\;  W_{\X,\Y}\left( \E^{(i)} \right)\cap Q\neq \emptyset  \right\}\Big|
+    .$$ The distinguishing advantage parametrized by $m$ writes
+    \begin{equation}
+        \label{eq:pd}
+        p_d = \max_{m\leq N} \mathrm{Pr}\left[Z > \frac{d}{2} \wedge Y<w\right].
+    \end{equation}
+    \item
+    Now, we focus on the values of $m$ around which the highest values of $p_d$ are met.
+    Note that we can always let $m_0\leq N$ and decompose Equation~\ref{eq:pd} into two regimes, $m\leq m_0$ and $m>m_0$.
+    \begin{eqnarray}
+        \label{eq:pd_dec}
+        p_d
+        &=& \max
+        \left\{
+            \max_{0< m\leq m_0}\mathrm{Pr}\left[Z > \frac{d}{2} \wedge Y<w\right],
+            \max_{m_0 < m \leq N}\mathrm{Pr}\left[Z > \frac{d}{2} \wedge Y<w\right]
+         \right\}
+         \\
+        &=& \max
+        \left\{
+            \max_{0< m\leq m_0}\mathrm{Pr}\left[Z > \frac{d}{2}\right] \mathrm{Pr} [Y<w],
+            \max_{m_0 < m \leq N}\mathrm{Pr}\left[Z > \frac{d}{2}\right] \mathrm{Pr} [Y<w]
+         \right\}
+         \\
+        &\leq& \max
+        \left\{
+            \max_{m\leq m_0}\mathrm{Pr}\left[Z > \frac{d}{2}\right] ,
+            \max_{m> m_0} \mathrm{Pr} [Y<w]
+         \right\}
+    \end{eqnarray}
+    The reason we did that simplification is the following: when $m$ is upper-bounded, the least probable event is $Z>\frac{d}{2}$, as this event captures the probability of \textit{many computation rounds} to be detected.
+    Likewise, when $m$ is lower-bounded, it means that at least $m_0$ rounds are being attacked: in this case the least probable event is to be undetected by those deviations.
+    We will in~\ref{item: m_0} develop an intuition on where to place the barrier $m_0$.
+    \item
+    For the moment, let us notice that in both terms, the maximal value is obtained at $m=m_0$.
+    The distinguishing advantage can therefore be written as
+    \begin{equation}
+        p_d = \max(\epsilon, \nu)
+    \end{equation}
+    where
+    \begin{equation}
+        \nu =
+        \mathrm{Pr}\left[Z > \frac{d}{2} \;|\; m_0 \; \text{rounds attacked}\right]
+        ,\qquad
+        \epsilon =
+        \mathrm{Pr} [Y<w\;|\; m_0 \; \text{rounds attacked}]
+    \end{equation}
+    \item With that being said, let us first calculate $\epsilon$.
+    First, let $X$ denote a random variable describing the number of test rounds affected by a non-trivial deviation.
+    Then, let $x>0$. We can always write
+    \begin{eqnarray}
+        \epsilon &=&
+        \mathrm{Pr} [Y<w\;|\; X>x] \quad \mathrm{Pr}[X>x]
+        +
+        \mathrm{Pr} [Y<w\;|\; X\leq x] \quad \mathrm{Pr}[X\leq x]
+        \\
+        &\leq&
+        \mathrm{Pr}[X\leq x]
+        +
+        \mathrm{Pr} [Y<w\;|\; X> x]
+    \end{eqnarray}
+    From there, we can notice that $X$ is naturally upper-bounded in the stochastic order by a hypergeometrically-distributed random variable $\tilde X \sim H(N, m_0, s)$.
+    We use this fact to compute the first term of the sum.
+    By using the tail bounds for such the hypergeometric variable, we have for $\chi_\epsilon\geq 0$:
+    \begin{equation}
+        \mathrm{Pr}\left[
+            \tilde X \leq \left(
+                \dfrac{m_0}{N} - \chi_\epsilon
+             \right)s
+         \right] \leq \exp(-2\chi_\epsilon^2 s)
+    \end{equation}
+    Using this tail bounds, the parametrization on $\chi_\epsilon$ requires to set $x = ({m_0}/{N} - \chi_\epsilon)s$ and we get
+    \begin{equation}
+        \mathrm{Pr}[X\leq x]
+        \leq
+        \mathrm{Pr}\left[
+            \tilde X \leq x
+         \right]
+         \leq \exp(-2\chi_\epsilon^2 s)
+    \end{equation}
+    Now we compute an upper-bound on the second term of the sum, noting that $$\mathrm{Pr} [Y<w\;|\;  X> x] \leq \mathrm{Pr} [Y<w\;|\; X= x]$$ so that $X$ is fixed and parametrized according to $\chi_\epsilon$ as previously.
+    Then, we notice that $Y$ conditioned on $X=x$ is upper-bounded in the stochastic order by a binomially-distributed variable $\tilde Y \sim (x, 1/k)$.
+    Indeed: the number of affected test rounds has been fixed to $x$, there are $k=|\mathcal Q|$ types of traps, and any non-trivial deviation is detected by at least one type of trap.
+    For Protocol~\ref{protocol:verification}, this is guaranteed by Lemma~\ref{lemma:harmful deviations are detected}, where the set of traps $\mathcal Q$ defined by \ref{eq: set of traps} was used. Consequently, $k=1+t$.
+    The probability that a given test round detects the non-trivial deviation of the Server is thus at least $1/k$.
+    The worst case is when the deviation is detected by only one type of trap, so we can fix the detection rate to $1/k$.
+    Using the tail bounds for the binomial variable, we have for
+    \begin{equation}
+        \mathrm{Pr}\left[
+            \tilde Y < w
+         \right]
+         \leq
+         \exp\left[
+            -2\dfrac{(x/k-w)^2}{x} \; \right]
+    \end{equation}
+    for $w < x/k$.
+    In the parametrization on $\chi_\epsilon$, this means $\chi_\epsilon < \frac{m_0}{N}-\frac{w}{s}k$.
+    In short, we can upper-bound $\epsilon$ as follows:
+    \begin{equation}
+        \label{eq:epsilon}
+        \epsilon \leq
+        \min_{\chi_\epsilon\in[0, \frac{m_0}{N}-\frac{w}{s}k]}
+        \exp(-2\chi_\epsilon^2 s) + \exp\left[
+            -2\dfrac{(
+                (\frac{m_0}{N}-\chi_\epsilon)
+                \frac{1}{k}-\frac{w}{s}
+                 )^2}{
+                \frac{m_0}{N}-\chi_\epsilon
+            } \; s
+          \right]
+    \end{equation}
+
+    \item Then, let us calculate $\nu$.
+    To this end, let us decompose the random variable $Z$ into $Z_1$ and $Z_2$, where $Z_1$ describes the number of computation rounds affected by a non-trivial deviation while $Z_2$ describes the number of computation rounds non-affected by the Server deviation but that nevertheless yield an incorrect outcome due to the probabilistic nature of the BQP computation.
+    Then, for $z_1>0$, $\nu$ can be written as
+    \begin{eqnarray}
+        \nu &=& \mathrm{Pr}\left[Z_1 + Z_2 > \frac{d}{2}\right] \\
+        &\leq& \mathrm{Pr}\left[Z_1 + Z_2 > \frac{d}{2} \;\; | Z_1> z_1\right] \;\; \mathrm{Pr}[Z_1>z_1]
+            + \mathrm{Pr}\left[Z_1 + Z_2 > \frac{d}{2} \;\; | Z_1\leq  z_1\right] \;\; \mathrm{Pr}[Z_1\leq z_1] \\
+        &\leq& \mathrm{Pr}[Z_1>z_1]
+            + \mathrm{Pr}\left[Z_1 + Z_2 > \frac{d}{2} \;\; | Z_1\leq  z_1\right] \\
+    \end{eqnarray}
+    Let us now study both terms separately.
+    The first term can be upper-bounded as follows. $Z_1$ is lower-bounded in the usual stochastic order by a $H(N, m_0, d)$ hypergeometrically distributed random variable $\tilde Z_1$.
+    Therefore, using the tails bound for such a distribution, we get for $\chi_\nu>0$, the desired bound if we re-write $z_1 = (m_0/N+\chi_\nu)d$:
+    \begin{equation}
+        \mathrm{Pr}\left[ Z_1 > \left( \dfrac{m_0}{N} + \chi_\nu \right)d \right] \leq \exp(-2\chi_\nu^2 d)\; .
+    \end{equation}
+    For the first term, let us note that
+    \begin{equation}
+        \mathrm{Pr}\left[Z_1 + Z_2 > \frac{d}{2} \;\; | Z_1\leq  z_1\right] \leq \mathrm{Pr}\left[Z_2 > \frac{d}{2} - z_1 \;\; | Z_1\leq  z_1\right] \leq \mathrm{Pr}\left[Z_2 > \frac{d}{2} - z_1 \;\; | Z_1= z_1\right]
+    \end{equation}
+    Now, with $Z_1$ fixed to $z_1$, $Z_2$ becomes upper-bounded in the usual stochastic order by a $B(d-z_1, \bqp)$ binomially-distributed random variable $\tilde Z_2$, as among the $d$ computation rounds, only $d-z_1$ are non-affected by a deviation, and the failure probability is $\bqp$ for each.
+    The tails bound for $X \sim B(n,\bqp)$ states that, for $n\bqp \le k$
+    \begin{equation}
+        \mathrm{Pr}[X> k] \leq \exp\left[
+            -2\dfrac{(n\bqp-k)^2}{n}
+         \right]
+    \end{equation}
+    Here, replacing $n$ by $d-z_1 = d(1-\frac{m_0}{N}-\chi_\nu)$, and $k$ by $\frac{d}{2}-z_1 = d(\frac{1}{2}-\frac{m_0}{N}-\chi_\nu)$, we get for $(d-z_1)\bqp < \frac{d}{2}-z_1$, or equivalently $\chi_\nu < \frac{1-2\bqp}{2-2\bqp}-\frac{m_0}{N}$ :
+    \begin{equation}
+        \mathrm{Pr}\left[Z_2 > \frac{d}{2}-z_1\right] \leq \exp\left[
+            -2
+            \dfrac{
+                [\left( 1-\frac{m_0}{N}-\chi_\nu \right)d\bqp - \left( \frac{1}{2}-\frac{m_0}{N}-\chi_\nu \right)d]^2
+            }{
+                \left( 1-\frac{m_0}{N}-\chi_\nu \right)d
+            }
+        \right]
+    \end{equation}
+    Finally, after simplifying and putting back the pieces together, we get the following
+    \begin{equation}
+        \label{eq: nu}
+        \nu \leq \min_{
+            \chi_\nu \in [0, \frac{1-2\bqp}{2-2\bqp}-\frac{m_0}{N}]
+        }
+        \exp[ -2\chi_\nu^2 d ] + \exp\left[
+            -2
+            \dfrac{
+                \left( (1-\frac{m_0}{N}-\chi_\nu)(1-\bqp)-\frac{1}{2} \right)^2
+            }{1-\frac{m_0}{N}-\chi_\nu} d
+         \right]
+    \end{equation}
+
+    \item \label{item: m_0}
+    Lastly, we need to develop an intuition on where to place $m_0$.
+    For this barrier to be meaningful, let the following scenario, in which a fraction $f$ of the total rounds are attacked by the Server with a non-trivial deviation.
+    Note that to obtain the classical output, the Client performs a majority vote over the obtained results.
+    Therefore, we are interested in quantifying the critical fraction that corrupts more than half of the outcomes.
+    However, we know that there is an inherent probability $\bqp$ of failure for a BQP computation.
+    Hence, our criteria becomes the following: if $f$ is the fraction of rounds attacked by a Server deviation, then this must satisfy $(1-\bqp)(1-f)>1/2$, in the sense the fraction $1-f$ of non-attacked rounds that succeed (with probability $1-\bqp$) are more than one half of the total rounds.
+    This becomes $f<(1-2\bqp)/(2-2\bqp)$. We then let $\varphi>0$ and parametrize $m_0$ according to how much the Server is far or close to attacking the critical fraction.
+    \begin{equation}
+        m_0 = \left( \dfrac{1-2\bqp}{2-2\bqp}-\varphi\right)N
+    \end{equation}
+    We can thus replace $m_0$ by this expression parametrized by $\varphi$ in Equations~\ref{eq:epsilon} and~\ref{eq: nu}.
+    \item Then, it means that for different values of $\varphi$, different values of $\epsilon, \nu$ are obtained: these have become function of $\varphi$.
+    \begin{equation}
+        \label{eq: epsilon_varphi}
+        \epsilon(\varphi) \leq
+        \min_{\chi_\epsilon\in[0, (\frac{1-2\bqp}{2-2\bqp}-\frac{w}{s}k)-\varphi ]}
+        \exp(-2\chi_\epsilon^2 s) + \exp\left[
+            -2\dfrac{( (\frac{m_0}{N}-\chi_\epsilon) \frac{1}{k}-\frac{w}{s} )^2}{ \frac{m_0}{N}-\chi_\epsilon } \; s
+          \right]
+    \end{equation}
+
+    \begin{equation}
+        \label{eq: nu_varphi}
+        \nu(\varphi) \leq \min_{ \chi_\nu \in [0, \varphi] }
+        \exp[ -2\chi_\nu^2 d ] + \exp\left[
+            -2 \dfrac{ \left( (1-\frac{m_0}{N}-\chi_\nu)(1-\bqp)-\frac{1}{2} \right)^2 }{1-\frac{m_0}{N}-\chi_\nu} d
+         \right]
+    \end{equation}
+
+    However, the distinguishing advantage can always be upper-bounded by the minimal one.
+    Furthermore, note that for the bounds on $\chi_\epsilon$ in Equation~\ref{eq: epsilon_varphi} to be well-defined, we need to have $\varphi < \frac{1-2\bqp}{2-2\bqp}-\frac{w}{s}k$.
+    Finally, the distinguishing advantage can be written as follows:
+    \begin{equation}
+        p_d \leq \min_{\varphi \in [0, \frac{1-2\bqp}{2-2\bqp}-\frac{w}{s}k]} (\max(\nu(\varphi), \epsilon(\varphi)))
+    \end{equation}
+    where again, as a reminder, $k=|\mathcal Q|$.
+    For Protocol \ref{protocol:verification}, $k=1+t$.
+
+    \item Now, to set a concrete bound, we can set the buffers $\chi_\epsilon, \chi_\nu, \varphi$ to concrete values.
+    Indeed, one can re-define the following constants:
+    \begin{itemize}
+        \item $\alpha = (1-2\bqp)/(2-2\bqp)$
+        \item $\Delta = \alpha-wk/s$
+        \item $m_0/N = \alpha-\varphi$
+    \end{itemize}
+    With this, the range of $\varphi$ is $[0, \Delta]$, so we can set $\varphi = \Delta/2$, in the middle of the range.
+    Then, the range for $\chi_\epsilon$ becomes $[0, \Delta/2]$, thus we can set $\chi_\epsilon = \chi_0:=\Delta/4$, again in the middle of the range.
+    Finally, for $\chi_\nu$ in the expression of $\nu$, the range is $[0, \varphi]=[0, \Delta/2]$ so we can again set $\chi_\nu=\chi_0$.
+    When we replace these buffer values in the above expressions, we get values of $\epsilon, \nu$ that upper-bound the actual values suggested by the minimisation problem above, but nevertheless negligible in the number of rounds $d, s$:
+    \begin{align}
+        \epsilon &\leq \exp( -2(\Delta/4)^2 s ) + \exp\left( -2\dfrac{ ((\alpha-3\Delta/4)/k-\frac{w}{s})^2 }{\alpha-3\Delta/4} s \right)
+        \\
+        \nu&\leq \exp( -2(\Delta/4)^2 d ) + \exp\left( -2\dfrac{ (((1-\alpha)+\Delta/4)(1-\bqp)-1/2)^2 }{(1-\alpha)+\Delta/4} d \right)
+    \end{align}
+
+\end{enumerate}
+\end{proof}

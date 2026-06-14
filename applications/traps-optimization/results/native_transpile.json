@@ -1,0 +1,103 @@
+{
+  "n_circuits": 12,
+  "n_non_bipartite": 0,
+  "n_with_lp_gap": 5,
+  "rows": [
+    {
+      "circuit": "circuit001.qasm",
+      "n_nodes": 11,
+      "bipartite": true,
+      "girth": null,
+      "lp_rate": 0.5,
+      "greedy_rate": 0.5
+    },
+    {
+      "circuit": "circuit023.qasm",
+      "n_nodes": 13,
+      "bipartite": true,
+      "girth": null,
+      "lp_rate": 0.5,
+      "greedy_rate": 0.5
+    },
+    {
+      "circuit": "circuit057.qasm",
+      "n_nodes": 11,
+      "bipartite": true,
+      "girth": 4,
+      "lp_rate": 0.5,
+      "greedy_rate": 0.5
+    },
+    {
+      "circuit": "circuit070.qasm",
+      "n_nodes": 11,
+      "bipartite": true,
+      "girth": null,
+      "lp_rate": 0.5,
+      "greedy_rate": 0.3333
+    },
+    {
+      "circuit": "circuit072.qasm",
+      "n_nodes": 11,
+      "bipartite": true,
+      "girth": 6,
+      "lp_rate": 0.5,
+      "greedy_rate": 0.3333
+    },
+    {
+      "circuit": "circuit074.qasm",
+      "n_nodes": 11,
+      "bipartite": true,
+      "girth": null,
+      "lp_rate": 0.5,
+      "greedy_rate": 0.3333
+    },
+    {
+      "circuit": "circuit106.qasm",
+      "n_nodes": 17,
+      "bipartite": true,
+      "girth": null,
+      "lp_rate": 0.5,
+      "greedy_rate": 0.3333
+    },
+    {
+      "circuit": "circuit114.qasm",
+      "n_nodes": 13,
+      "bipartite": true,
+      "girth": null,
+      "lp_rate": 0.5,
+      "greedy_rate": 0.3333
+    },
+    {
+      "circuit": "circuit115.qasm",
+      "n_nodes": 13,
+      "bipartite": true,
+      "girth": null,
+      "lp_rate": 0.5,
+      "greedy_rate": 0.5
+    },
+    {
+      "circuit": "circuit123.qasm",
+      "n_nodes": 9,
+      "bipartite": true,
+      "girth": null,
+      "lp_rate": 0.5,
+      "greedy_rate": 0.5
+    },
+    {
+      "circuit": "circuit135.qasm",
+      "n_nodes": 9,
+      "bipartite": true,
+      "girth": null,
+      "lp_rate": 0.5,
+      "greedy_rate": 0.5
+    },
+    {
+      "circuit": "circuit150.qasm",
+      "n_nodes": 15,
+      "bipartite": true,
+      "girth": null,
+      "lp_rate": 0.5,
+      "greedy_rate": 0.5
+    }
+  ]
+}

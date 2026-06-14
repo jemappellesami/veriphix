@@ -1,0 +1,461 @@
+\section{Verification \emph{via} Magic-Blindness}
+\label{section:verification}
+In this section, we use the previous constructions and results to tackle the verification of any $\BQP$ quantum computation on $n$ qubits with inherent error $\bqp$.
+Throughout this section, we consider that $C$ is expressed in the Clifford+MSI model with $t$ state injection layers. Namely, with the convention introduced in preliminaries \ref{subsection:prelims:QC}, $C$ is a $(n,t)$-Clifford+MSI computation.
+\paragraph{Description of the Ideal Resource.}
+We will first define the Verified Delegated Quantum Computation Resource~\ref{resource:verification}. It captures mathematically the verifiability property of a delegated quantum computation, \emph{i.e.}, it is secure by design. It explicitly models the fact that the Server either behaves honestly or forces an abort, but cannot corrupt the result of an accepted computation.
+Notably, the resource leaks the Clifford structure of the computation to the Server, showcasing that blindness of the entire circuit is not a requirement. When the Server is honest, the resource outputs the correct decision bit $z^\star \in \{0,1\}$ for the language $L$.
+By our definition of $\BQP$, the first measurement outcome $y$ of the computation $C(\ket{\x})$ satisfies:
+\(
+\Pr[y = z^\star] \ge 1 - c .
+\)
+
+\begin{resourcee}
+    \caption{Verified Delegated Quantum Computation}
+    \label{resource:verification}
+    \begin{algorithmic}[0]
+        \State \textbf{Client inputs:} $\x \in \{0,1\}^n$, and $(n,t)$-Clifford+MSI computation $C$.
+    \State \textbf{Public information:} Clifford structure $\C_{1}, \dots, \C_{t+1} \in \Clifford_n$, parameters of the protocol.
+    \State \textbf{Server inputs:} $\c \in \{0,1\}$, set to $0$ if honest.
+    \Procedure{Computation by the Resource}{}
+        \If{$\c=0$}
+            \State Output $\ketbra{\Acc} \otimes \ketbra{z^\star}$ to the Client, where $z^\star$ is the biased output of $C(\ket\x)$.
+        \Else
+            \State Output $\ketbra{\Rej} \otimes \ketbra{\perp}$ to the Client.
+        \EndIf
+    \EndProcedure
+    \end{algorithmic}
+\end{resourcee}
+\paragraph{Rationale of the Protocol.}
+The chosen design will follow the template of other trap-based protocols consisting of interleaving computation and test rounds, while delegating them to the Server in a blind way using the previously introduced Magic-Blind Delegated QC Protocol~\ref{protocol:mblind_DQC}. This will ensure that the honesty of the Server can be effectively deduced from what is observed on the test rounds alone.
+
+\paragraph{Tolerance to a constant amount of circuit-level noise.}
+We also show that the protocol remains relevant in the presence of a constant amount of circuit-level Server-side noise. It also naturally accounts for certain forms of Client-side noise, namely those that can be equivalently interpreted as occurring on the Server side (see the proof of robustness).
+The noise is modeled by an error rate $p_{err}<1/2$ quantifying the probability that an honest run produces an incorrect result (other than because of the $\BQP$ error)—the same noise model considered in other robust verification protocols \cite{LMKO21verifying,BN25noise}. We provide an upper bound for the tolerated values of $p_{err}$.
+
+\paragraph{Organization of the section.}
+In order to do so, we will first define in~\ref{subsection:framework single qubit} preliminary notions to explain the Protocol. Using the fact that Server deviations are reduced to Pauli deviations (Section~\ref{subsection:blind:Pauli dev}), we identify those that actually harm the computation, and introduce a construction to detect them: it is based on the concept of \emph{traps}.
+Second, in Section~\ref{subsection:verification:protocol} we introduce a trap-based verification protocol for Clifford+MSI computations, prove its composable security in implementing Resource~\ref{resource:verification} with a negligible construction error even with circuit-level noise with strength bounded by \(p_{err}\). Finally, we show that the trap design can be generalized into a generic framework for composable verification in the circuit-model in Section~\ref{subsection:framework generalized}.
+
+\subsection{Designing traps}
+\label{subsection:framework single qubit}
+
+In this section, we first classify Pauli deviations for a computation in the Clifford+MSI model. Then we design \emph{traps}—classically simulable computations yielding deterministic measurement outcomes—to detect them. Since they will be delegated blindly, traps must be designed
+for the class $\class$ of indistinguishable computations under MB-DQC with Clifford structure $\C_1, ..., \C_{t+1}$.
+
+\subsubsection{Classification of deviations}
+In Section \ref{subsection:blind:Pauli dev} we saw a strong consequence of delegating computations in $\class$ using the MB-DQC Protocol \ref{protocol:mblind_DQC}: any malicious behavior is reduced to a convex combination of Pauli deviations on $n+t$ qubits applied before the final measurements (Lemma~\ref{lemma:mblind:Pauli deviations}).
+Let us analyze the impact of a single Pauli deviation $\E\in\Pauli_{n+t}$.
+Intuitively, if $\E$ commutes with the measurements, it does not change the distribution of outcomes and is considered \emph{harmless}. For instance, applying a $\Z$ gate before a computational-basis measurement does not change the result. However, a deviation is problematic if it contains a bit flip ($\X$ or $\Y$) on a wire that contributes to the final result.
+In this work, since we are interested in the decision bit (the first wire) and the integrity of the non-Clifford resources (the MSI wires), we first define the set of qubits with a useful measurement outcome:
+\begin{definition}[Useful qubits]
+    \label{verification:def:useful}
+    For any Clifford+MSI computation on $n$ qubits with $t$ MSI steps, we define the set of \emph{useful qubits} as
+    \begin{equation}
+        Q = \{1, n+1, \dots, n+t\}\; .
+    \end{equation}
+    These are the qubits whose measurement outcome is relevant for the computation. This set includes the output wire (whose outcome is used as a decision bit) and the ancilla wires whose outcomes are used to perform state-injection.
+\end{definition}
+Let $W_{\X\Y}(\E) \subseteq \{1, \dots, n+t\}$ be the set of indices where the Pauli operator $\E$ acts as $\X$ or $\Y$.
+Based on this, we define harmfulness as follows:
+\begin{definition}[Harmful deviations]
+    \label{verification:def:harmful}
+    Let $\E\in\Pauli_{n+t}$. We say that $\E$ is \emph{harmful} if its bit-flip support intersects with the set of useful output qubits (consistent with Def. \ref{verification:def:useful}):
+    $$  W_{\X\Y}(\E) \cap Q \neq \emptyset.$$
+\end{definition}
+This definition captures the intuition that any deviation that does not affect the output wire (index 1) or the magic state injections (indices $n+1$ to $n+t$) is effectively harmless for the verified $\BQP$ computation. Indeed, as a consequence of the Reduction to Pauli Deviation Lemma \ref{lemma:mblind:Pauli deviations}, any malicious behavior can be pushed until the end of the computation, \emph{i.e} right before the measurements. There, the individual Pauli deviations on wires $2, ..., n$ don't affect the outcomes distribution of qubit $1$ since they are local operations.
+
+\subsubsection{Definitions of traps and detection properties}
+Here, we first build traps for the Clifford+MSI model, then relate to the deviations they allow to detect.
+The requirements to build a trap are: belonging to $\class$, classical simulability, and determinism in the measurement outcomes.
+
+To be classically simulable, a trap must be in the magic-free subclass of $\class$: it must contain only stabilizer injections.
+Furthermore, to force a deterministic measurement outcome, we use the stabilizer formalism as teased in the preliminaries~\ref{subsection:prelims:QC}, using the fact that in that subclass, the transformation from the input qubits to the output qubits (before measurements) is the Clifford circuit $\G \;=\; \C_{t+1}\circ \F_t \circ \C_t \circ \cdots \circ \F_1 \circ \C_1$ (see Figure~\ref{fig:blindness:G}).
+Below is a definition that allows us to derive traps that make the measurement outcome of a single qubit deterministic. Consistent with Definitions~\ref{verification:def:harmful}, \ref{verification:def:useful}, we focus on trapping the qubits that have a useful measurement outcome.
+
+\begin{definition}[Trap for a useful qubit]
+  \label{def:verification:trap}
+  A \emph{trap} for $\class$, parametrized by a qubit index $q \in Q$, is defined as an instance of $\class$ with $\x_0$ and $\Alabel_1, \dots, \Alabel_t$ such that $\ket{\x_0} \otimes \rho_{\Alabel_1} \otimes \dots \otimes \rho_{\Alabel_t}$ is stabilized by $\stab_q = \G^\dagger \Z_{q} \G$. We refer to $C_q$ as a trap for $q$.
+\end{definition}
+
+Using the above notation, delegating trap $C_q$ means for the Client to compute an appropriate $+1$-eigenstate, extract its classical representation in terms of $\x_0$, $\Alabel_1, ..., \Alabel_t$ and feed it to Protocol \ref{protocol:mblind_DQC}. On the other hand, to delegate the target computation on input $\x$, the Client uses the Protocol with $\x$ and $\Alabel_i=\Tlabel$ for each $i$.
+
+The following definition captures the Pauli deviations that a trap allows to detect. Intuitively, a Pauli deviation $\E$ \emph{triggers} a trap if it flips the expected measurement outcome. Indeed, for measurements in the $\Z$ basis, the outcome is deterministically $0$ by design if $\E=\id$ or $\Z$, and is flipped if $\E=\X$ or $\Y$.
+
+\begin{definition}[Detection of deviations]
+  Let $\E\in\Pauli_{n+t}$ be a Pauli deviation, and let $C_q$ be a trap for $q\in Q$. We say that deviation $\E$ is \emph{detected} by trap $C_q$ if the deviation and $\Z_q$ anti-commute, and that it is \emph{undetected} if they commute:
+  \begin{equation}
+    \emph{Trap $C_q$ detects $\E$}\; \iff \{\Z_q, \E\} = 0,
+    \quad
+    \emph{Trap $C_q$ does not detect $\E$}\; \iff [\Z_q, \E] = 0.
+  \end{equation}
+\end{definition}
+
+\subsubsection{Building a concrete set of traps}
+
+The purpose of trap-based verification is to be able to detect any harmful Pauli deviation. Hence, verification is secure if there are enough traps to detect all the harmful deviations. In this work, we consider the set of traps
+\begin{equation}
+    \label{eq: set of traps}
+    \mathcal Q = \{C_{i} \; \text{for}\; i\in Q\},
+\end{equation}
+meaning one trap for each useful output qubit.
+The following lemma ensures that the set of traps detects all Server deviations.
+
+\begin{lemma}[Harmful deviations are detected]
+  \label{lemma:harmful deviations are detected}
+  Let $\E\in\Pauli_{n+t}$ be a harmful deviation, and let $\mathcal Q$ be the set of traps of Equation~\ref{eq: set of traps}. Then, there is at least one trap in $\mathcal Q$ that detects $\E$.
+\end{lemma}
+\begin{proof}
+    By Definition~\ref{verification:def:harmful}, a harmful deviation $\E$ satisfies $W_{\X\Y}(\E) \cap Q \neq \emptyset$. Let $i$ be an index in this intersection. Since $[\E]_i \in \{\X, \Y\}$, the Pauli operator anti-commutes with the measurement basis, i.e., $\{\Z_i, \E\} = 0$. Thus, by definition of detection, the trap $C_i \in \mathcal{Q}$ detects $\E$.
+\end{proof}
+
+\subsection{A trap-based verification protocol}
+\label{subsection:verification:protocol}
+We can finally introduce the Verified Delegated Quantum Computation Protocol~\ref{protocol:verification}.
+It allows the Client to verify her $(n,t)$-Clifford+MSI computation $C$ with $\BQP$ error $\bqp$.
+The verification mechanism in this protocol uses the above trap construction. It defines a trap for each qubit in $Q$---i.e.~it uses the set of traps $\mathcal Q$---thereby ensuring all harmful deviations are detected.
+Then, it follows the usual Test/Computation paradigm mentioned in the Introduction, in Figure~\ref{fig:verif-canvas}. The Client samples a random partition of test and computation rounds according to chosen parameters $d$ (number of \emph{computation rounds}) and $s$ (number of \emph{test rounds}), and chooses a threshold $w$ smaller than $s$: the number of tolerated test-round failures. For each test round, she delegates a trap at random. For computation rounds, she delegates the target computation. Both can be simply expressed as using MB-DQC on a different input state and choice of state injection, both of these being perfectly hidden from the Server, by security of Protocol~\ref{protocol:mblind_DQC}. When the delegation phase is over, the Client checks the outcomes of the test rounds to see if more than $w$ test rounds failed. That is, she checks how many traps have yielded outcome $1$. It amounts to summing such events over the whole set of test rounds and rejecting if the total is greater than $w$. When the computation is accepted, the result is obtained by performing a majority vote over the first outcome of each computation round.
+
+\begin{protocoll}
+\caption{Verified Delegated Quantum Computation}
+\label{protocol:verification}
+\begin{algorithmic}[0]
+    \State \textbf{Client inputs:} $\x\in\bin^n$, $(n,t)$-Clifford+MSI computation $C$, protocol parameters $d, s$ and $w<s$
+    \Comment{Number of computation/test rounds, and threshold}
+    \State \textbf{Public Information:} Clifford structure of $C$, set of traps $\mathcal Q$, and $d, s, w$.
+
+  \Procedure{{Client - Sample random permutation of test/computation rounds.}}{}
+    \State Sample a random permutation $\perm$ of $[N]$. Then for $i\in \perm$:
+    \State If $i\leq d$: set $C^{(i)} \leftarrow C$. \Comment{(Computation round)}
+    \State If $i> d$: sample $C_{q_i}$ randomly from $\mathcal Q$. Set $C^{(i)} \gets C_{q_i}$. \Comment{(Test round)}
+  \EndProcedure
+
+  \Procedure{{Client-Server - Delegate rounds blindly.}}{}
+
+  \State For $i\in \perm$, delegate $C^{(i)}$ using Magic-Blind DQC Protocol~\ref{protocol:mblind_DQC}, receive $\b^{(i)}$.
+    \State Set $\b = \b^{(1)} || ... || \b^{(N)}$
+  \EndProcedure
+
+  \Procedure{{Client - Traps Check}}{}
+    \State Compute the number of failed test rounds $\sum_{i>d}b^{(i)}_{q_i}$ and aborts if $\geq w$. Else continue.
+  \EndProcedure
+
+  \Procedure{{Client - Majority Vote}}{}
+  \State If there exists $y\in \bin$ such that $\#\{\, i \leq d \;:\; b^{(i)}_1 = y \,\} > d/2$, then output $y$.
+  \State Else, repeat the protocol.
+\EndProcedure
+
+\end{algorithmic}
+\end{protocoll}
+
+Theorem~\ref{theorem:verification security} is the main result of this paper: it captures the fact that Protocol~\ref{protocol:verification} implements Resource~\ref{resource:verification} up to a negligible distance that depends on the parameters chosen by the Client, essentially the number of test and computation rounds ($s$ and $d$), while giving the range of admissible values for the threshold $w$ (in order for the protocol to be secure). Moreover, it tolerates circuit-level noise with rate $p_{err} < w/s$.
+
+\begin{theorem}
+    \label{theorem:verification security}
+    Let $C$ be a $\BQP$ computation expressed in the Clifford+MSI model on $n$ qubits with $t$ MSI steps and $\BQP$ error $\bqp$.
+    Let Protocol \ref{protocol:verification} be instanciated with $C$ and $d, s\in \naturals$, with $N=d+s$. Also, let  $k=|\mathcal Q|=1+t$ and $\alpha=\tfrac{1-2\bqp}{2-2\bqp}$.
+    Then, for any chosen threshold $w\in\naturals$ such that $0\leq \tfrac{w}{s} < \tfrac{\alpha}{k}$,
+    Protocol~\ref{protocol:verification} $\epsilon$-constructs Resource~\ref{resource:verification} in the Abstract Cryptography framework with $\epsilon = \max(\epsilon_{cor}, \epsilon_{sec})$ where $\epsilon_{cor}, \epsilon_{sec}$ are negligible in $N$.
+
+In addition, for an honest-but-noisy Server with circuit-level noise rate $p_{err}<w/s$, the correctness error $\epsilon_{rob}$ is negligible in $N$.
+\end{theorem}
+
+Below, we proceed with a proof of correctness: it shows that when the Server is honest and perfect, no traps are triggered and there is only a negligible probability that the outcome of the majority vote differs from the output of the Ideal Resource. Then, we give a proof of robustness, analyzing the case of an honest-but-noisy Server: we similarly show that fewer than $w$ out of $s$ test rounds fail as long as $p_{err}< w/s$, which is intuitive given the notion of circuit-level noise\footnote{Note that here we voluntarily do not explore the case where the noise alters enough computation rounds---to corrupt the outcome of the majority vote---without triggering enough test rounds---to be detected. Indeed, dealing with this kind of noise is identical to dealing with a malicious adversary that wants to corrupt the outcomes while staying undetected, so it is taken care of in the security proof.}.
+Finally, we prove security against arbitrarily malicious behavior from the Server that might try to corrupt the outcome of the majority vote without triggering more than $w$ test rounds.
+This concludes the proof of composability and noise robustness for our verification protocol, and thus the main result of this work.
+
+\begin{proof}[Proof of correctness]
+    Assume the Server is honest. By construction of the test rounds, all traps are deterministic
+    in honest executions of Protocol~\ref{protocol:mblind_DQC}, hence no trap is triggered and
+    the Client reaches the output step.
+    It remains to bound the probability that the Client's majority vote on the $d$ computation
+    rounds outputs an incorrect decision bit. Let $z^\star \in \{0,1\}$ denote the correct
+    decision bit for the delegated $\BQP$ computation $C$ (i.e., $z^\star=1$ if
+    $x\in L$ and $z^\star=0$ otherwise).
+    Also, for $i\leq d$ let $\b^{(i)} \in \{0,1\}^n$ be the outcome of the measurement of all qubits and $y^{(i)} = b^{(i)}_1$ be the first bit, namely the output bit of computation round $i$.
+    By correctness of Protocol~\ref{protocol:mblind_DQC},
+    $\b^{(i)}$ follows the distribution induced by $C$, and in particular $y^{(i)}$ follows the marginal distribution of the first qubit.
+    Indeed, since $C$ decides the language with error at most $c < 1/2$,
+    we have
+    \[
+    \Pr[y^{(i)} \neq z^\star] \le c.
+    \]
+    Let $Y := \sum_{i=1}^d \mathbf 1[y^{(i)} \neq z^\star]$ be the number of incorrect outputs.
+    Then $Y$ is stochastically dominated by $X\sim \mathrm{Bin}(d,c)$, hence
+    \[
+    \Pr\!\left(Y > \tfrac d2\right) \le \Pr\!\left(X > \tfrac d2\right).
+    \]
+    By Hoeffding's inequality (Lemma~\ref{lemma:hoeffding:binomial}),
+    \[
+    \Pr\!\left(X > \tfrac d2\right)\le \exp\!\left(-2d\left(\tfrac12-c\right)^2\right).
+    \]
+    Therefore, conditioned on the Server being honest and the trap test passing (which occurs
+    with probability~1), the Client's majority vote outputs $z^\star$ except with probability at
+    most $\epsilon_{\mathrm{cor}} := \exp\!\left(-2d\left(\tfrac12-c\right)^2\right)$.
+    \end{proof}
+
+\begin{proof}[Proof of robustness.]
+    In the presence of noise, test rounds might fail even for an honest Server. A rejection is obtained if more than  $w$ test rounds fail.
+    Let $Y$ be the random variable that denotes the number of failed test rounds. Because it is stochastically dominated by $X\sim \mathrm{Bin}(s,p_{err})$, the above expressions can be re-used: as long as $p_{err}< \tfrac w s$, the probability that more than $w$ rounds are affected is upper-bounded by $\epsilon_{rob} :=\exp\!\left(-2(p_{err}-\tfrac w s)^2 s\right)$.
+
+    This robustness guarantee holds for any circuit-level noise that is independent of the Client's secret parameters throughout the execution of the MB-DQC protocol. This condition is naturally satisfied for Server-side noise. For Client-side circuit-level noise, the independence from the secret needs to be assumed. In such a case, security is maintained because the Client-side noise could equally be seen as the first deviation of a malicious server. We refer the interested reader to \cite{KLMO25plugging} for managing Client-side noise that depends on the Client's secrets.
+
+\end{proof}
+
+\begin{proof}[Security proof]
+    Here, we prove the security of Protocol~\ref{protocol:verification} by introducing Simulator~\ref{simulator:vdqc} below.
+\begin{simulatorr}
+    \caption{Verified Delegated Quantum Computation}
+    \label{simulator:vdqc}
+    \begin{algorithmic}[0]
+
+    \Procedure{Simulator emulates Client.}{With same procedures as Protocol~\ref{protocol:verification}}
+    \State Choose an arbitrary $n$-bit input string $\x_\emptyset$.
+    \State Sample random permutation of test/computation rounds.
+    \State Delegate rounds blindly to the Server with $\x^{(i)}=\x_\emptyset$ on computation rounds.
+    \State Check Traps. Set $c=0$ if less than $w$ were triggered, $1$ else.
+    \EndProcedure
+
+    \Procedure{{Simulator - report to Ideal Resource}}{}
+    \State Send $c$ to the Ideal Resource.
+    \EndProcedure
+    \end{algorithmic}
+\end{simulatorr}     The Simulator has access to what is leaked by the protocol: the size of the input $n$, the decomposition of the target computation in Clifford gates $\C_1...\C_{t+1}$, the resulting $n+t$-Clifford map $\G$ to build the input state of traps, and $d, s, w$ the parameters of the protocol.
+
+Its only purpose is to infer the Server's honesty as faithfully as in the Real World, encode that in a bit $c$, and send it to the Ideal Resource. In other words, the Simulator does not need to perform the computation $C$ on input $\x$. As a consequence, it does not need $\x$, and can instead start with any $n$-bit input $\x_\emptyset$. Yet, one must check that this replacement does not affect its ability to detect a malicious Server. This follows directly from the composability of Protocol~\ref{protocol:mblind_DQC}, which ensures that the cases where $\x$ or $\x_\emptyset$ are used as inputs are indistinguishable from the transcripts available to the Server.
+
+    Below, we express the state of the total system after interaction with an arbitrarily malicious Server in Protocol~\ref{protocol:verification}. When the permutation symbol $\perm$ appears as a superscript of a given quantity, it refers to the fact that the quantity is defined for a fixed permutation $\perm$ of computation rounds and test rounds, together with a random assignment of traps to test rounds. In fact, $\perm$ describes the configuration sampled at random by the Client at the start of the protocol. With a slight abuse of notation, we will simply refer to $\perm$ as a choice of permutation, implicitly meaning a choice of permutation and trap configuration.
+
+    \paragraph{Using the Reduction to Pauli Deviations.}
+    Since Protocol~\ref{protocol:mblind_DQC} is composably secure in the AC framework, it is in particular composable in parallel. Therefore, since it is used $N$ times in parallel in Protocol~\ref{protocol:verification}, it benefits from the security properties mentioned in Section~\ref{subsection:blind:MB-DQC}, in particular the Reduction to Pauli Deviations Lemma~\ref{lemma:mblind:Pauli deviations} : for any malicious Server deviation on $N$ parallel usages of Protocol~\ref{protocol:mblind_DQC}, there exists a convex combination of Pauli operators on $N\times (n+t)$ qubits such that the total state after interaction with the Server is
+    \begin{align}
+        \label{eq:verif:after Pauli}
+        \rho_{real}^\perm &=
+        \sum_{\b}
+        \sum_{\E\in\Pauli_{N\times(n+t)}}
+        \abs{\alpha_{\E}}^2
+        \times
+            \ketbra \b
+            \circ
+            \E
+            [\rho_{cor, \b}^{\perm}]
+        \otimes \U_{\E}\left[
+            \ketbra0^{\otimes w}
+        \right],
+    \end{align}
+    where we refer to the definitions of Lemma~\ref{lemma:mblind:Pauli deviations} for
+        $\rho_{cor, \b}^{\perm}
+        =
+        \bigotimes_{i=1}^N
+        \rho_{cor, \b^{(i)}, C^{(i)}}$.
+
+    \paragraph{Output and abort probability analysis.}
+    After interaction with a malicious Server, in both worlds, the traps are checked by analyzing the outcomes of test rounds ($i>d$) of the permutation $\perm$.
+    In this step, we want to express the acceptance probability.
+    Note that Equation~\ref{eq:verif:after Pauli} implies that for a given permutation $\perm$ and for a fixed Pauli deviation $\E$, the distributions of outcomes on test rounds and of those on computation rounds are independent.
+
+    We thus introduce a random variable $Y^{(\sigma)}_\E$ counting the number of failed test rounds when deviation $\E$ is applied and the choice of permutation is $\sigma$.
+    In terms of that random variable, the acceptance probability for permutation $\perm$ when a fixed deviation $\E$ is applied can be expressed as
+    \begin{align}
+        p_{\E}^{(\perm)}
+        &=
+        \Pr[Y^{(\sigma)}_\E < w].
+    \end{align}
+    It is identical in both worlds, because of the above comment. It does not depend on the state used in computation rounds ($\rho$ for the Client in the Real World, $\rho_\emptyset$ for the Simulator in the Ideal World).
+
+    Finally, in the Real World, a majority vote is computed on the decision bits
+    $y^{(i)} := \b^{(i)}_1$ of the computation rounds $i \le d$.
+    A wrong outcome occurs if the majority vote differs from the correct decision
+    bit $z^\star \in \{0,1\}$.
+    Let us define a random variable $Z^{(\perm)}_\E$ counting the number of such failures on computation rounds, whether they are caused by the deviation, or simply the inherent $\BQP$ error.
+    In terms of this random variable, the probability that a bad result is output after a majority vote, for a given permutation $\perm$ and fixed deviation $\E$ is
+    \begin{equation}
+        q^{(\perm)}_{\E}
+        =
+        \Pr[Z^{(\sigma)}_\E > \frac d 2].
+    \end{equation}
+
+    The final output state in the Real World can thus be written as
+    \begin{multline}
+        \rho^{\perm}_{out,\mathrm{real}}
+        =
+        \sum_{\E\in\Pauli_{N\times(n+t)}}
+        |\alpha_\E|^2
+        \Big[
+            p^{(\perm)}_{\E}\ketbra{\Acc}
+            \otimes
+            \big(
+                q^{(\perm)}_{\E}\ketbra{z^\star\oplus 1}
+                +
+                (1-q^{(\perm)}_{\E})\ketbra{z^\star}
+            \big)
+        \\
+        +
+            (1-p^{(\perm)}_{\E})
+            \ketbra{\Rej}\otimes\ketbra{\perp}
+        \Big]
+        \otimes
+        \U_\E\!\left[
+            \ketbra0^{\otimes w}
+        \right].
+    \end{multline}
+
+    Regarding the Ideal World, there is no majority vote: conditioned on acceptance, the Resource outputs the correct decision bit $z^\star$, and otherwise outputs
+    $\perp$. As already mentioned, the acceptance probability is the same, because of independence of test and computation rounds.
+    Hence,
+    \begin{multline}
+        \rho^{\perm}_{out,\mathrm{ideal}}
+        =
+        \sum_{\E\in\Pauli_{N\times(n+t)}}
+        |\alpha_\E|^2
+        \Big[
+            p^{(\perm)}_{\E}\ketbra{\Acc}\otimes\ketbra{z^\star}
+            +
+            (1-p^{(\perm)}_{\E})
+            \ketbra{\Rej}\otimes\ketbra{\perp}
+        \Big]
+        \\
+        \otimes
+        \U_\E\!\left[
+            \ketbra0^{\otimes w}
+        \right].
+    \end{multline}
+
+    \paragraph{Reducing the Server deviation to a single $N\times(n+t)$-qubit Pauli.}
+    Now, without loss of generality, we make the following two reductions: first, we observe that the working register is always unentangled from the rest of the state that constitutes the output of the protocol. It therefore does not contribute to any distinguishing advantage and can be traced out. Second, since the output contains a convex combination of possible Pauli deviations, it is enough to consider the case where the Server applies a single Pauli deviation $\E$ for which the distinguishing probability is maximal. Together, for a choice of permutation $\perm$ and a fixed deviation $\E$, we obtain
+        \begin{multline}
+            \rho_{out, real}^\perm
+            =
+            p_{\E}^{(\perm)}\ketbra\Acc
+                \otimes\big(
+                    q^{(\perm)}_{\E}\ketbra{z^\star\oplus 1}
+                    +
+                    (1-q^{(\perm)}_{\E})\ketbra{z^\star}
+                \big)
+                \\
+                +
+                (1-p_{\E}^{(\perm)})
+                \ketbra\Rej\otimes \ketbra \perp
+        \end{multline}
+        and
+        \begin{equation}
+            \rho_{out, ideal}^\perm
+            =
+                p_{\E}^{(\perm)}\ketbra\Acc
+                \otimes\ketbra{z^\star}
+                +
+                (1-p_{\E}^{(\perm)})
+                \ketbra\Rej\otimes \ketbra \perp.
+        \end{equation}
+
+         \paragraph{From the point of view of the Distinguisher,} the choice of the permutation and trap configurations $\perm$ is not known. The state is thus a probabilistic mixture of all possible permutations $\perm$ uniformly. Denoting $S$ the set of permutations of $[N]$ and trap configurations, we have
+        \begin{equation}
+            \rho_{out, ideal}=
+            \frac{1}{|S|}
+            \sum_{\perm \in S} \rho_{out, ideal}^\perm
+        \end{equation}
+        and
+        \begin{equation}
+            \rho_{out, real}=
+            \frac{1}{|S|}
+            \sum_{\perm \in S} \rho_{out, real}^\perm.
+        \end{equation}
+
+    \paragraph{Evaluating the distinguishing advantage.}
+    The distinguishing advantage is the maximum probability that the Distinguisher discriminates the correct scenario by observing the transcripts $\rho_{out, ideal}$ and $\rho_{out, real}$, with a maximization taken over the choice of cheating strategies.
+    This can thus be captured by the trace distance between the two transcripts, maximized over all the possible Pauli deviations\footnote{The maximization is only over the Server choice of deviation because the working register has no impact on the output state, see the above comment. Otherwise, it would have been a maximization over the deviation and the content of the working register.}. It is indeed equivalent to the concept of the diamond norm. Hence, we can write the distinguishing advantage $p_d$ as
+    \begin{align}
+        p_d
+        &= \max_{\E\in\Pauli_{N\times(n+t)}}
+        \norm{\rho_{out, real}-\rho_{out, ideal}}_{\Tr\strut}
+        \\
+        &=
+        \max_{\E\in\Pauli_{N\times(n+t)}}
+        \frac{1}{|S|}
+        \norm{\sum_{\perm \in S} \rho_{out, real}^\sigma-\rho_{out, ideal}^\sigma}_{\Tr\strut}
+        \\
+        \label{verif:proof:triangle ineq.}
+        &\leq
+        \max_{\E\in\Pauli_{N\times(n+t)}}
+        \frac{1}{|S|}
+        \sum_{\perm \in S}
+        \norm{
+             \rho_{out, real}^\sigma-\rho_{out, ideal}^\sigma}_{\Tr\strut}
+        \\
+        \label{verif:proof:final p_d}
+        &=
+        \max_{\E\in\Pauli_{N\times(n+t)}}
+        \frac{1}{|S|}
+        \sum_{\perm \in S}
+            p_{\E}^{(\perm)}\times q_{\E}^{(\perm)},
+    \end{align}
+    where eq.~\ref{verif:proof:triangle ineq.} follows from the triangle inequality, and eq.~\ref{verif:proof:final p_d} follows from the definition of $p_\E^{(\perm)}$ and $q_\E^{(\perm)}$.
+    We can re-write the above expression as
+    $p_d = \max_\E \Pr[Y < w \wedge Z > d/2]$, where $Y$ is the random variable counting
+    the number of triggered test rounds and $Z$ counts the number of computation rounds
+    whose decision bit is incorrect, under a fixed deviation $\E$ and a uniformly random
+    permutation $\perm$.
+    Using Lemma~\ref{lemma:security error} proved in Section~\ref{section: verification proofs}, this is negligible in $s$ and $d$ as long as $\tfrac w s< \tfrac\alpha k$, where $\alpha = (1-2\bqp)/(2-2\bqp)$ and $k=|\mathcal Q|=1+t$. This proves the exponential security of the protocol.
+\end{proof}
+
+\begin{restatable}[Negligible security error]{lemma}{securityerror}
+    \label{lemma:security error}
+    Let $C$ be a computation with $\BQP$ error $\bqp$, and $\alpha=(1-2\bqp)/(2-2\bqp)$.
+    Let $\mathcal Q$ be a set of traps that detects any harmful deviation, and let $k=|\mathcal Q|$.
+    Then, using the notations of Protocol~\ref{protocol:verification}, as long as $\tfrac w s< \tfrac\alpha k$,
+     for any Pauli deviation chosen by the Server the
+    probability that the deviation triggers less than $w$ rounds and affects more than $d/2$ computation rounds is negligible in $d, s$.
+\end{restatable}
+
+\subsection{Towards a verification framework in the circuit-model
+}
+\label{subsection:framework generalized}
+Note that the concepts of Section~\ref{subsection:framework single qubit} can naturally be generalized to constitute a modular framework for composable verification in the circuit-model, similar to \cite{KKLM22unifying} for the measurement-based setting. We hereby outline this generalization, which will be explored more formally and in more detail in future work.
+
+\subsubsection{From single-qubit traps to multi-qubit traps}
+A \emph{trap} in this work is simply a qubit index $q\in \mathcal Q$ aiming to yield a deterministic outcome for qubit $q$. A \emph{generalized trap} is a subset of qubit indices $Q\subset \mathcal Q$ aiming to yield a deterministic result for the parity of measurement outcomes of qubits in $Q$.
+\begin{definition}[Generalized trap]
+    A \emph{generalized trap} $Q$ is a subset of qubit indices $Q\subset \mathcal Q$. An input state for trap $Q$ is a $+1$ eigenstate of $\stab_Q=\G^\dagger \Z_Q\G$ where $\Z_Q = \prod_{q\in Q} \Z_{q}$.
+\end{definition}
+
+A generalized trap $Q$ detects Pauli deviations that anti-commute with $\Z_Q$.
+\begin{definition}[Detection property of generalized traps]
+    Using the same notations as Section~\ref{subsection:framework single qubit}, trap $Q$ detects deviation $\E$ if $\{\Z_Q, \E\}=0$, and does not detect it if $[\Z_Q, \E]=0$.
+\end{definition}
+Here, it appears that the traps introduced in~\ref{subsection:framework single qubit} are single-qubit traps, where $|Q|=1$.
+\paragraph{Adapting the traps check.}
+Following this generalization, the \textsc{Traps Check} from Protocol~\ref{protocol:verification} operation can be re-written. Indeed, introduce $\tau_Q(\b)=\bigoplus_{q\in Q} b_q$. Then, if we write $Q_i$ the trap for test round $i$, then the sum in \textsc{Traps Check} becomes $\sum_{i>d} \left(
+        \tau_Q(\b^{(i)})
+    \right)$.
+
+\paragraph{Adapting the security guarantees.}
+Given a set of traps, the same security properties hold if Lemma~\ref{lemma:harmful deviations are detected} can apply, meaning if any harmful deviation is detected by at least one trap of the set. We can thus state the following theorem, informal, adapted version of Theorem 6.
+
+\begin{theorem}[Informal]
+    Let $R$ be a set of generalized traps $Q_1, ..., Q_r$. Let Protocol $\ref{protocol:verification}'$ be a variant of Protocol~\ref{protocol:verification} where, in test rounds, the Client chooses a trap $Q_i$ randomly from $R$, delegates it, and uses the adapted trap-check operations above. Then, if the traps $Q_1, ..., Q_r$ detect all harmful deviations, the same security guarantees as in Theorem 6 apply.
+\end{theorem}
+
+\subsubsection{Combining compatible traps in a single test run}
+
+Furthermore, two traps $Q_1$ and $Q_2$ can have a compatible input state, meaning a tensor product of $n+t$ single-qubit states stabilized by both $\stab_{Q_1}$ and $\stab_{Q_2}$; then the traps can be \emph{merged}: the Client delegates both traps in the same test run, and has to check that \emph{none} was triggered. Indeed, let $\rho\otimes\rho_\A$ be an input state for both traps (which exists by assumption). The Client can delegate the test run $\C_1...\C_{t+1},\A_1...\A_t$ as usual.
+
+Note that this is not always possible. If the stabilizers of traps $Q_1$ and $Q_2$ do not allow it, then they have to be delegated in different test runs. The following definition captures trap compatibility.
+
+\begin{definition}[Compatible traps]
+    Generalized traps $Q_1, Q_2$ are compatible if their stabilizers $\stab_{Q_1}, \stab_{Q_2}$ commute on each index. Indeed, only then can there exist an input state consisting of a tensor product of $n+t$ single-qubit states stabilized by both.
+\end{definition}
+\paragraph{Adapting the traps check.}
+Now, let $R=Q_1, ..., Q_r$ be a set of compatible traps. Then, define $\tau_R(\b)= \bigwedge_{Q\in R} \tau_Q(\b)$. The sum in the \textsc{Traps Check} operation can be written
+$\sum_{i>d}
+\left(
+    \tau_R(\b^{(i)})
+\right)
+$. As a consequence, the same security properties hold if the initial set of traps (without merging) detects all harmful deviations, since such a deviation would trigger at least one of the traps.
+
+\paragraph{Merging traps is equivalent to graph coloring.}
+Quite naturally, if $Q_1$ and $Q_2$ are compatible, and $Q_2$ and $Q_3$ are compatible, then $Q_1$ and $Q_3$ are compatible, so the three traps can be done in a single test run. This merging procedure thus reduces the number of types of test runs, and finding the optimal merging procedure can be reduced to a graph coloring problem \cite{BNZ25sampling,VYI19measurement}—finding the minimum number of test runs is thus equivalent to finding the chromatic number of a graph, which is NP-hard.
+
+\paragraph{Connection with \cite{B18how}}
+This allows us to showcase \cite{B18how} as an instance of Protocol~\ref{protocol:mblind_DQC}, where the initial circuit was compiled by writing Hadamard gates as $\H=\H\T\T\H\T\T\H\T\T\H$, $\P=\T\T$. It compiles the initial circuit by introducing even more magic-state injection steps. As a direct consequence, it increases the number of qubits that the Client has to send at each round of MB-DQC. Another direct, yet naive, consequence is that it would increase the number of types of test runs. This is true if we stick to the vanilla definition of our traps in Section~\ref{subsection:framework single qubit}. But by exploiting the fact that \emph{traps can be merged}, we can show that this compilation allows the traps to be merged into \emph{only two different types of test runs}. Indeed, after Broadbent's compilation trick, only Hadamard gates and $\CNOT$ remain in the circuit.
+It can be shown that the graph corresponding to the traps merging here is a bipartite graph, with a chromatic number of $2$, which explains the protocol with two types of test runs initially obtained by Broadbent in \cite{B18how}.
+

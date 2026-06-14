@@ -1,0 +1,102 @@
+{
+  "n_correlated": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "lp_rates": [
+    1.0,
+    0.6429,
+    0.625,
+    0.5882,
+    0.5714,
+    0.5714
+  ],
+  "uniform_rates": [
+    0.5,
+    0.4545,
+    0.4545,
+    0.4545,
+    0.4545,
+    0.4545
+  ],
+  "full_instance": {
+    "n_deviations": 15,
+    "lp_detection_rate": 0.5714,
+    "uniform_detection_rate": 0.4545,
+    "X_basis_mass": 0.286,
+    "Y_basis_mass": 0.715,
+    "n_tests_used": 6,
+    "distribution": [
+      {
+        "weight": 0.2857,
+        "basis": "X",
+        "test_set": [
+          5,
+          13,
+          21,
+          29,
+          37
+        ]
+      },
+      {
+        "weight": 0.1429,
+        "basis": "Y",
+        "test_set": [
+          0,
+          13,
+          21,
+          29,
+          37
+        ]
+      },
+      {
+        "weight": 0.1429,
+        "basis": "Y",
+        "test_set": [
+          4,
+          5,
+          13,
+          21,
+          29
+        ]
+      },
+      {
+        "weight": 0.1429,
+        "basis": "Y",
+        "test_set": [
+          1,
+          5,
+          21,
+          29,
+          37
+        ]
+      },
+      {
+        "weight": 0.1429,
+        "basis": "Y",
+        "test_set": [
+          3,
+          5,
+          13,
+          21,
+          37
+        ]
+      },
+      {
+        "weight": 0.1429,
+        "basis": "Y",
+        "test_set": [
+          2,
+          5,
+          13,
+          29,
+          37
+        ]
+      }
+    ]
+  }
+}

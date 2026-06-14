@@ -1,0 +1,37 @@
+\documentclass{article}
+\input{preamble}
+\author{Amit Saha\thanks{Corresponding author: \texttt{abamitsaha@gmail.com}}, Harold Ollivier \\ DI-ENS, Ecole Normale Supérieure, 45 rue  d'Ulm, 75005 Paris\\ Universit\'e PSL, CNRS, INRIA}
+\date{}
+\title{Noise Inference by Recycling Test Rounds in Verification Protocols}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+  Interactive verification protocols for quantum computations allow to build trust between a client and a service provider, ensuring the former that the instructed computation was carried out faithfully. They come in two variants, one without quantum communication that requires large overhead on the server side to coherently implement quantum-resistant cryptographic primitives, and one with quantum communication but with repetition as the only overhead on the service provider's side. Given the limited number of available qubits on current machines, only quantum communication-based protocols have yielded proof of concepts.
+  
+  In this work, we show that the repetition overhead of protocols with quantum communication can be further mitigated if one examines the task of operating a quantum machine from the service provider's point of view. Indeed, we show that the test rounds data, whose collection is necessary to provide security, can indeed be recycled to perform continuous monitoring of noise model parameters for the service provider. This exemplifies the versatility of these protocols, whose template can serve multiple purposes and increases the interest in considering their early integration into development roadmaps of quantum machines.
+\end{abstract}
+
+\input{sec-introduction}
+
+\input{sec-integration}
+
+\input{sec-depolarizing}
+
+\input{sec-example}
+
+\input{sec-discussion}
+
+\paragraph{Acknowledgements.} We thank Maxime Garnier and Thierry Martinez for the fruitful discussion on numerical analysis. This work was funded in part by the European Union under Grant No. 101080142 (EQUALITY) and by France 2030 under the French National Research Agency award number ANR-22-PNCQ-0002 (HQI).
+
+\bibliographystyle{alpha}
+%\bibliography{../qubib/qubib}l
+%\bibliography{qubib,../qubib/qubib}
+\bibliography{qubib}
+\appendix
+
+\input{app-verification} 
+
+\end{document}

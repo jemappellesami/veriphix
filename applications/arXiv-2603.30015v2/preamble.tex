@@ -1,0 +1,192 @@
+\setlength{\marginparwidth}{4.5cm}
+
+\usepackage[utf8]{inputenc}
+%\usepackage[T1]{fontenc}
+\usepackage{etex}
+
+\pdfoutput=1
+%\usepackage{subcaption}
+\usepackage[english]{babel}
+%\usepackage{wrapfig}
+\let\proof\relax\let\endproof\relax
+\usepackage{amsthm}
+\usepackage{hyperref}
+\usepackage{color}
+\usepackage{mathtools}
+% \usepackage{amsmath} loaded by mathtools
+\usepackage{amssymb}
+\renewcommand{\qedsymbol}{$\blacksquare$}
+\usepackage{amsfonts}
+%\usepackage{quantikz}
+\usepackage{authblk}
+\renewcommand\Authfont{\normalsize}
+
+\usepackage{physics}
+\usepackage{float}
+\usepackage{enumitem}
+\setlist{noitemsep} %no separation between list items
+%\usepackage{algcompatible}
+\usepackage{algpseudocodex}
+\algrenewcommand\algorithmicprocedure{$\triangleright$}
+
+%\usepackage{subfigure}
+\usepackage{graphicx}
+\usepackage{subcaption}
+%\usepackage[dvipsnames]{xcolor}
+\usepackage{bm} 
+%\usepackage{qcircuit}
+\usepackage{adjustbox}
+\usepackage{multirow}
+%% \ifcomment
+%% \else
+%\usepackage[table,xcdraw]{xcolor}
+%% \fi % xcolor is already loaded by the tufte-handout class
+%\usepackage{tikz, graphics} % graphics, if the figure contains embedded images
+%\usetikzlibrary{arrows.meta, % if the figure contains arrow-tips
+%                bending,     % arrow tips on arcs are "bent," i.e., deformed a bit
+%                patterns,     % if the figure contains pattern fills
+%                shapes,positioning
+%               }
+
+%\usetikzlibrary{arrows.meta,      % if the figure contains arrow-tips
+%	bending,          % arrow tips on arcs are "bent," i.e., deformed a bit
+%	patterns,         % if the figure contains pattern fills
+%	shapes,
+%	positioning}
+% tikzstyles
+
+%\tikzstyle{node}=[draw=black, minimum size = 10mm, shape = circle]
+%\tikzstyle{nodep}=[draw=black, minimum size = 5mm, shape = circle]
+%\tikzstyle{vertex}=[draw=black, fill = black, shape = circle, scale = .5]
+%\tikzstyle{snode}=[draw=black, shape = circle]
+%\tikzstyle{onode}=[draw=black, minimum size = 5mm, shape = rectangle]
+%\tikzstyle{none}=[]
+%\tikzstyle{dashed edge}=[-, dashed, dash pattern=on 2pt off 1.5pt, thick, draw={rgb,255: red,68; green,136; blue,255}]
+
+% https://tex.stackexchange.com/questions/75836/creating-a-seamless-xor-symbol-as-node
+%\tikzset{XOR/.style={draw,circle,append after command={
+%			[shorten >=\pgflinewidth, shorten <=\pgflinewidth,]
+%			(\tikzlastnode.north) edge (\tikzlastnode.south)
+%			(\tikzlastnode.east) edge (\tikzlastnode.west)
+%		}
+%	}
+%}
+
+%\tikzset{bullet/.style={circle, fill,minimum size=4pt,inner sep=0pt, outer sep=0pt}}
+
+
+\usepackage [
+  n,
+  advantage,
+  operators,
+  sets,
+  adversary,
+  landau,
+  probability, 
+  notions,
+  logic,
+  ff,
+  mm,
+  primitives,
+  events,
+  complexity,
+  asymptotics,
+  keys
+  ] {cryptocode}
+ 
+
+\usepackage[strings]{underscore}
+\usepackage{bm}
+\usepackage{booktabs} % nicer tables
+
+\renewcommand{\cc}[1]{\complclass{#1}}
+\newcommand{\Abort}{\mathsf{Abort}}
+\newcommand{\Acc}{\mathsf{Accept}}
+\newcommand{\Enc}{\mathsf{Enc}}
+\newcommand{\Dec}{\mathsf{Dec}}
+\newcommand{\Redo}{\mathsf{Redo}}
+\newcommand{\BQP}{\mathsf{BQP}}
+\newcommand{\BPP}{\mathsf{BPP}}
+
+\newcommand{\X}{\mathsf{X}}
+\newcommand{\Y}{\mathsf{Y}}
+\newcommand{\Z}{\mathsf{Z}}
+\newcommand{\Id}{\mathsf{I}}
+\newcommand{\Ha}{\mathsf{H}}
+\newcommand{\CZ}{\mathsf{CZ}}
+\newcommand{\D}{\mathsf{D}}
+\newcommand{\cZ}{\mathsf{CZ}}
+\newcommand{\cX}{\mathsf{CX}}
+\newcommand{\Sp}{\mathsf{S}}
+\newcommand{\CNOT}{\mathsf{CNOT}}
+\newcommand{\QOTP}{\mathsf{QOTP}}
+\newcommand{\T}{\mathsf{T}}
+\newcommand{\W}{\mathsf{W}}
+
+
+\newcommand{\cptp}[1]{\mathsf{#1}} % CPTP notation
+\newcommand{\pd}[1]{\mathcal{#1}}  % Probability distribution notation
+\newcommand{\sch}[1]{\bm{#1}} % scheme
+
+
+%\floatstyle{ruled}
+
+\usepackage[capitalise]{cleveref}
+ % \let\oldcref\cref
+ % \renewcommand\cref[1]{\oldcref{#1}\textsuperscript{#1}}
+
+
+\usepackage{thmtools}
+\declaretheorem[name=Protocol, refname={Protocol, Protocols}]{protocol}
+\declaretheorem[name=Resource, refname={Resource, Resources}]{resource}
+\declaretheorem[name=Routine, refname={Routine, Routines}]{routine}
+
+% \newfloat{simulator}{htb!}{idf}
+% \floatname{simulator}{Simulator}
+
+% \newfloat{routine}{htb!}{idf}
+% \floatname{routine}{Routine}
+
+% \ifcomment
+% %% \setcounter{secnumdepth}{2}
+% %% \newtheorem{theorem}{Theorem}
+% %% \newtheorem{lemma}[theorem]{Lemma}
+% %% \newtheorem{definition}[theorem]{Definition}
+% %% \newtheorem{corollary}[theorem]{Corollary}
+% %% \newtheorem{remark}[theorem]{Remark}
+% %% \newcommand{\comment}[2]{\sidenote{{\textbf{#1}: #2}}}
+% %% \newcommand{\mn}[2]{\textsuperscript{\textcolor{red}{\textsf{\textbf{#1}}}}\marginnote{\tiny \textcolor{red}{\textsf{{\textbf{#1:}} #2}}}}
+
+
+%\usepackage{marginnote}
+% \newcommand{\comment}[2]{\textsuperscript{\textcolor{red}{\textsf{\textbf{#1}}}}\marginnote{\tiny {\textsf{{\textbf{#1:}} #2}}}}
+% \newcommand{\pn}[2]{\textcolor{red}{\textsf{\textbf{#1:} #2}}}
+% \else
+% \newcommand{\mn}[2]{}
+% \newcommand{\pn}[2]{}
+% \newcommand{\comment}[2]{}
+% \fi
+
+
+\usepackage[a4paper,lmargin=1.25in, rmargin=1.25in]{geometry}
+
+%\usepackage[disable]{todonotes} % use to remove notes
+\usepackage{todonotes}
+\todostyle{holl}{color=green!30, size=\footnotesize}
+\todostyle{as}{color=blue!30, size=\footnotesize}
+
+\setcounter{secnumdepth}{3}
+
+% \usepackage{markdown}
+% \usepackage[hashEnumerators,texMathDollars]{markdown}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+% \newtheorem{resourceenv}{Resource}
+% \newtheorem{protocolenv}{Protocol}
+% \newtheorem{simulatorenv}{Simulator}

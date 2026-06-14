@@ -1,0 +1,16 @@
+\section{Discussion}
+This work shows that the perceived overhead of verification, as measured by the increase in rounds to obtain a verified outcome, is not actually a real overhead, as it can serve other purposes, such as partial recalibration of the device. This is a significant advantage for the service provider as it has the potential to greatly reduce the downtime of the machine. More fundamentally, it shows that the information that is gathered about the behavior of the machine by verification protocols is highly dependent on what one is willing to assume. The client does only obtain an accept or reject bit, while the server can update a full error model with it. This indeed further strengthens the link between verification and error detection put forth in~\cite{KKLM22unifying}.
+
+This work opens new future directions, such as proof-of-concept implementation of \cref{proto:vbqc-aces} on real devices and the obtaining of effective certified noise maps that could be used to perform verified error mitigation observable estimation. It also naturally asks whether other noise estimation techniques can be integrated into verification protocols, whether they are parametric or also allow the discovery of the noise structure itself.
+
+On the more practical side, several optimizations and limitations should be taken into account to ensure the number of live qubits remains manageable in spite of the necessity of performing entangling gates in different orders, some orderings are clearly impractical if they lead to keeping some qubits live for a very long time, or if the number of live qubits exceeds the capacity of the machine itself.  We leave this open for future work.
+
+
+% \begin{itemize}
+% \item Dependency on error model calls for reproducing this analysis for other error models
+% \item Should be testing it on real devices
+% \item Can we get a verified noise map (more akin to some sort of certification of the device and in what sense)
+% \item Can we perform more advanced methods like wild-card?
+% \item Can we also obtain some structure form the noise (cite Daniel)
+% \item Not all orderings are indeed feasible as it conflicts with minimizing the number of live qubits.
+% \end{itemize}
