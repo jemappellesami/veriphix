@@ -60,8 +60,12 @@ from veriphix.sampling_circuits.brickwork_state_transpiler import (
 from veriphix.uncorrelated_depolarising_noise_model import UncorrelatedDepolarisingNoiseModel
 from veriphix.verifying import generate_eigenstate
 
-# The Stim transpiler is vendored in the ACES experiment folder.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "aces"))
+# The Stim transpiler is vendored in the ACES experiment folder (not a pip-installed
+# package). Workers don't run this sys.path hack, so the module must be shipped to them
+# explicitly (see upload_file in main); _ACES_DIR / _STIM_MODULE are captured here for that.
+_ACES_DIR = Path(__file__).resolve().parent.parent / "aces"
+_STIM_MODULE = _ACES_DIR / "stim_pauli_preprocessing.py"
+sys.path.insert(0, str(_ACES_DIR))
 from stim_pauli_preprocessing import BasicState, pattern_to_stim_circuit
 
 app = typer.Typer(add_completion=False)
@@ -295,6 +299,10 @@ def _get_cluster(
             memory=f"{memory}GB",
             walltime=f"{walltime}:00:00",
             scheduler_options={"dashboard_address": f":{port}"},
+            # Put the vendored ACES module dir on the workers' PYTHONPATH so every SLURM
+            # job (including ones that join later via scale) can import
+            # stim_pauli_preprocessing natively. Backs up the upload_file in main.
+            job_script_prologue=[f"export PYTHONPATH={_ACES_DIR}:$PYTHONPATH"],
         )
     if scale is not None:
         cluster.scale(scale)
@@ -388,6 +396,14 @@ def main(
     cluster = _get_cluster(walltime, memory, cores, port, scale)
     dask_client = dask.distributed.Client(cluster)
     typer.echo(f"Dask dashboard: {dask_client.dashboard_link}")
+
+    # Ship the vendored Stim transpiler to every worker (current and future). It is not a
+    # pip-installed package, so workers cannot import `stim_pauli_preprocessing` on their
+    # own — without this, Cell.execute fails to deserialise on the worker and the run
+    # silently stalls (this is the one thing the gospel benchmark doesn't need).
+    if _STIM_MODULE.exists():
+        dask_client.upload_file(str(_STIM_MODULE))
+        typer.echo(f"Uploaded {_STIM_MODULE.name} to workers.")
 
     # Per-dimension timing accumulators (aggregated from CellResult as futures land).
     dim_nodes: dict[tuple[int, int], int] = {}
