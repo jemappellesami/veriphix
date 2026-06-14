@@ -94,7 +94,7 @@ def _draw_frontiers(ax, grid: np.ndarray, frontiers: list[tuple[float, tuple, st
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--csv", default="applications/benchmark-stim/benchmark_stim_results.csv")
+    parser.add_argument("--csv", default="applications/benchmark-stim/benchmark_stim_results_1e5_s100.csv")
     parser.add_argument("--p-ent", type=float, default=None, help="Select a single p_ent (default: all).")
     parser.add_argument("--N", default="1500,3000,6000", help="Comma-separated round budgets.")
     parser.add_argument("--epsilon", default="1e-7,1e-8", help="Comma-separated soundness targets.")
@@ -141,11 +141,11 @@ def main() -> None:
         ax.set_ylabel("Width (nqubits)")
         ax.set_title(f"{METRIC_LABEL}  (p_ent = {p_ent:.0e}, c = {args.bqp_error})")
 
-        for i, _w in enumerate(widths):
-            for j, _d in enumerate(depths):
-                v = grid[i, j]
-                text = "NA" if np.isnan(v) else (f"{v:.1e}" if 0 < v < 0.001 else f"{v:.3f}")
-                ax.text(j, i, text, ha="center", va="center", fontsize=9)
+        # for i, _w in enumerate(widths):
+        #     for j, _d in enumerate(depths):
+        #         v = grid[i, j]
+        #         text = "NA" if np.isnan(v) else (f"{v:.1e}" if 0 < v < 0.001 else f"{v:.3f}")
+        #         ax.text(j, i, text, ha="center", va="center", fontsize=9)
 
         if frontiers:
             _draw_frontiers(ax, grid, frontiers)
