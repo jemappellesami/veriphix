@@ -34,6 +34,7 @@ import dataclasses
 import logging
 import sys
 import time
+from contextlib import ExitStack
 from dataclasses import dataclass
 from multiprocessing import freeze_support
 from pathlib import Path
@@ -318,6 +319,11 @@ def _load_done(path: Path) -> set[tuple[str, str, str]]:
         return {(row["p_ent"], row["width"], row["depth"]) for row in csv.DictReader(f)}
 
 
+def _csv_path(out_dir: Path, p_ent: float, shots: int) -> Path:
+    """Per-(noise level, precision) output file: both p_ent and shots pin the filename."""
+    return out_dir / f"benchmark_stim_results_p{p_ent:.1e}_s{shots}.csv"
+
+
 def _parse_ints(text: str) -> list[int]:
     return [int(x) for x in text.split(",") if x.strip()]
 
@@ -372,7 +378,7 @@ def main(
     shots:       Annotated[int, typer.Option()] = 100,
     test_rounds: Annotated[int, typer.Option()] = 100,
     threshold:   Annotated[int, typer.Option()] = 0,
-    out_csv:     Annotated[Path, typer.Option()] = Path("applications/benchmark-stim/benchmark_stim_results.csv"),
+    out_dir:     Annotated[Path, typer.Option(help="Directory for per-(p_ent,shots) CSVs")] = Path("applications/benchmark-stim"),
     seed:        Annotated[int, typer.Option()] = 42,
     walltime:    Annotated[int | None, typer.Option(help="SLURM: walltime in hours")] = None,
     memory:      Annotated[int | None, typer.Option(help="SLURM: memory in GB")] = None,
@@ -407,11 +413,14 @@ def main(
     ]
     n_cells_total = len(cells)
 
-    out_csv.parent.mkdir(parents=True, exist_ok=True)
-    done = _load_done(out_csv)
-    if done:
-        typer.echo(f"Resuming: {len(done)} cells already in {out_csv}")
-    cells = [c for c in cells if (str(c.p_ent), str(c.width), str(c.depth)) not in done]
+    # One CSV per noise level (named by p_ent and shots). Resume is per file.
+    out_dir.mkdir(parents=True, exist_ok=True)
+    paths = {p: _csv_path(out_dir, p, shots) for p in ent_list}
+    done = {p: _load_done(path) for p, path in paths.items()}
+    n_existing = sum(len(d) for d in done.values())
+    if n_existing:
+        typer.echo(f"Resuming: {n_existing} cells already on disk across {len(paths)} file(s)")
+    cells = [c for c in cells if (str(c.p_ent), str(c.width), str(c.depth)) not in done[c.p_ent]]
 
     # Submit largest tiles first (LPT scheduling): cost per tile ~ |V| = width*(4*depth+1).
     # Starting the expensive tiles early lets the many cheap ones backfill idle workers, so
@@ -433,8 +442,6 @@ def main(
     if not cells:
         typer.echo("Nothing to do — all cells already present.")
         return
-
-    is_new = not out_csv.exists() or out_csv.stat().st_size == 0
 
     cluster = _get_cluster(walltime, memory, cores, port, scale)
     dask_client = dask.distributed.Client(cluster)
@@ -469,10 +476,16 @@ def main(
     try:
         futures = [dask_client.submit(Cell.execute, c, pure=False) for c in cells]
 
-        with out_csv.open("a", newline="") as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=CSV_FIELDS)
-            if is_new:
-                writer.writeheader()
+        with ExitStack() as stack:
+            # One open file + writer per noise level; route each result to its p_ent file.
+            writers: dict[float, tuple[object, csv.DictWriter]] = {}
+            for p, path in paths.items():
+                is_new = not path.exists() or path.stat().st_size == 0
+                fh = stack.enter_context(path.open("a", newline=""))
+                w = csv.DictWriter(fh, fieldnames=CSV_FIELDS)
+                if is_new:
+                    w.writeheader()
+                writers[p] = (fh, w)
 
             for fut in dask.distributed.as_completed(futures):
                 try:
@@ -499,6 +512,7 @@ def main(
                 )
 
                 if isinstance(report, CellResult):
+                    fh, writer = writers[report.p_ent]
                     writer.writerow(
                         {
                             "p_ent": report.p_ent,
@@ -508,7 +522,7 @@ def main(
                             "p_false_reject": report.p_false_reject,
                         }
                     )
-                    csvfile.flush()
+                    fh.flush()
                     n_ok += 1
 
                     key = (report.width, report.depth)
@@ -559,8 +573,10 @@ def main(
 
     typer.echo(
         f"\nDone. {n_ok} results, {n_fail} failures  "
-        f"(wall {_fmt(time.monotonic() - loop_start)})  ->  {out_csv}"
+        f"(wall {_fmt(time.monotonic() - loop_start)})  ->  {len(paths)} file(s) in {out_dir}"
     )
+    for p in sorted(paths):
+        typer.echo(f"    p_ent={p:.1e} -> {paths[p].name}")
 
 
 if __name__ == "__main__":
