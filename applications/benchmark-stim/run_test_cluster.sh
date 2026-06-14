@@ -2,7 +2,6 @@
 # Small test run on the cluster (5×5 grid = 25 cells, ~2 min)
 
 set -e
-cd /Users/sabdulsa/Codes/veriphix
 
 export PYTHONUNBUFFERED=1
 ./.venv/bin/python -u applications/benchmark-stim/benchmark_stim_dask.py \
