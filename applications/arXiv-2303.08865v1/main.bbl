@@ -1,0 +1,192 @@
+\begin{thebibliography}{10}
+\providecommand{\url}[1]{\texttt{#1}}
+\providecommand{\urlprefix}{URL }
+\providecommand{\doi}[1]{https://doi.org/#1}
+
+\bibitem{ACC20:multi}
+Alon, B., Chung, H., Chung, K.M., Huang, M.Y., Lee, Y., Shen, Y.C.: Round
+  efficient secure multiparty quantum computation with identifiable abort (Nov
+  2020), \url{https://eprint.iacr.org/2020.1464}
+
+\bibitem{B21:secure}
+Bartusek, J.: Secure quantum computation with classical communication. In:
+  Nissim, K., Waters, B. (eds.) Theory of Cryptography. pp. 1--30. Springer
+  International Publishing, Cham (2021)
+
+\bibitem{BCKM21:the}
+Bartusek, J., Coladangelo, A., Khurana, D., Ma, F.: On the round complexity of
+  secure quantum computation. In: Malkin, T., Peikert, C. (eds.) Advances in
+  Cryptology -- CRYPTO 2021. pp. 406--435. Springer International Publishing,
+  Cham (2021)
+
+\bibitem{BCGH+06:secure}
+Ben-Or, M., Crepeau, C., Gottesman, D., Hassidim, A., Smith, A.: Secure
+  multiparty quantum computation with (only) a strict honest majority. In:
+  Proceedings of the 47th Annual IEEE Symposium on Foundations of Computer
+  Science. pp. 249--260. FOCS '06, IEEE Computer Society, Washington, DC, USA
+  (2006). \doi{10.1109/FOCS.2006.68},
+  \url{http://dx.doi.org/10.1109/FOCS.2006.68}
+
+\bibitem{BFK09:universal}
+Broadbent, A., Fitzsimons, J., Kashefi, E.: Universal blind quantum
+  computation. In: IEEE (ed.) 50th Annual IEEE Symposium on Foundations of
+  Computer Science (2009)
+
+\bibitem{CDN15:multi}
+Cramer, R., Damgrd, I.B., Nielsen, J.B.: Secure Multiparty Computation and
+  Secret Sharing. Cambridge University Press, USA, 1st edn. (2015),
+  \url{https://dl.acm.org/doi/book/10.5555/2846411}
+
+\bibitem{CGS02:secure}
+Cr{\'e}peau, C., Gottesman, D., Smith, A.: Secure multi-party quantum
+  computation. In: Proceedings of the Thiry-fourth Annual ACM Symp. on Theory
+  of Computing. p.~643. STOC '02, ACM, New York, NY, USA (2002).
+  \doi{10.1145/509907.510000}, \url{http://doi.acm.org/10.1145/509907.510000}
+
+\bibitem{DK06:determinism}
+Danos, V., Kashefi, E.: Determinism in the one-way model. Phys. Rev. A
+  \textbf{74},  052310 (Nov 2006). \doi{10.1103/PhysRevA.74.052310},
+  \url{http://link.aps.org/doi/10.1103/PhysRevA.74.052310}
+
+\bibitem{DGJM+20:secure}
+Dulek, Y., Grilo, A.B., Jeffery, S., Majenz, C., Schaffner, C.: Secure
+  multi-party quantum computation with a dishonest majority. In: Canteaut, A.,
+  Ishai, Y. (eds.) Advances in Cryptology -- EUROCRYPT 2020. pp. 729--758.
+  Springer International Publishing, Cham (2020).
+  \doi{10.1007/978-3-030-45727-3_25}
+
+\bibitem{DFPR14:composable}
+Dunjko, V., Fitzsimons, J.F., Portmann, C., Renner, R.: Composable security of
+  delegated quantum computation. In: Sarkar, P., Iwata, T. (eds.) Advances in
+  Cryptology -- ASIACRYPT 2014. pp. 406--425. Springer Berlin Heidelberg,
+  Berlin, Heidelberg (2014)
+
+\bibitem{DFLS16:adaptive}
+Dupuis, F., Fehr, S., Lamontagne, P., Salvail, L.: Adaptive versus non-adaptive
+  strategies in the quantum setting with applications. In: Robshaw, M., Katz,
+  J. (eds.) Advances in Cryptology -- CRYPTO 2016. pp. 33--59. Springer Berlin
+  Heidelberg, Berlin, Heidelberg (2016)
+
+\bibitem{DNS10:secure}
+Dupuis, F., Nielsen, J.B., Salvail, L.: Secure Two-Party Quantum Evaluation of
+  Unitaries against Specious Adversaries. Springer Berlin Heidelberg, Berlin,
+  Heidelberg (2010). \doi{10.1007/978-3-642-14623-7_37},
+  \url{http://dx.doi.org/10.1007/978-3-642-14623-7_37}
+
+\bibitem{DNS12:actively}
+Dupuis, F., Nielsen, J.B., Salvail, L.: Actively secure two-party evaluation of
+  any quantum operation. In: Advances in Cryptology--CRYPTO 2012, pp. 794--811.
+  Springer (2012)
+
+\bibitem{FKSZ+13:feasibility}
+Fehr, S., Katz, J., Song, F., Zhou, H.S., Zikas, V.: Feasibility and
+  completeness of cryptographic tasks in the quantum world. In: Sahai, A. (ed.)
+  Theory of Cryptography. pp. 281--296. Springer Berlin Heidelberg, Berlin,
+  Heidelberg (2013)
+
+\bibitem{FKD18:reducing}
+Ferracin, S., Kapourniotis, T., Datta, A.: Reducing resources for verification
+  of quantum computations. Physical Review A  \textbf{98}(2),  022323 (2018)
+
+\bibitem{FK17:unconditionally}
+Fitzsimons, J.F., Kashefi, E.: Unconditionally verifiable blind quantum
+  computation. Phys. Rev. A  \textbf{96},  012303 (Jul 2017).
+  \doi{10.1103/PhysRevA.96.012303},
+  \url{https://link.aps.org/doi/10.1103/PhysRevA.96.012303}
+
+\bibitem{GKK19:verification}
+Gheorghiu, A., Kapourniotis, T., Kashefi, E.: Verification of quantum
+  computation: An overview of existing approaches. Theory of Computing Systems
+  \textbf{63}(4),  715--808 (May 2019). \doi{10.1007/s00224-018-9872-3},
+  \url{https://doi.org/10.1007/s00224-018-9872-3}
+
+\bibitem{HSS15:classical}
+Hallgren, S., Smith, A., Song, F.: Classical cryptographic protocols in a
+  quantum world. International Journal of Quantum Information  \textbf{13}(04),
+   1550028 (2015). \doi{10.1142/S0219749915500288},
+  \url{https://www.worldscientific.com/doi/abs/10.1142/S0219749915500288}
+
+\bibitem{HEB03:multi}
+Hein, M., Eisert, J., Briegel, H.J.: Multi-party entanglement in graph states
+  (2003)
+
+\bibitem{HHTF18:composable}
+Houshmand, M., Houshmand, M., Tan, S.H., Fitzsimons, J.: Composable secure
+  multi-client delegated quantum computation. arXiv preprint arXiv:1811.11929
+  (2018)
+
+\bibitem{KDK15:optimising}
+Kapourniotis, T., Dunjko, V., Kashefi, E.: On optimising quantum communication
+  in verifiable quantum computing (2015), presented at AQIS'15 conference
+
+\bibitem{KKLM+22:framework}
+Kapourniotis, T., Kashefi, E., Leichtle, D., Music, L., Ollivier, H.: Unifying
+  quantum verification and error-detection: Theory and tools for optimisations.
+  arxiv:2206.00631  (2022)
+
+\bibitem{KKMO21:delegating}
+Kapourniotis, T., Kashefi, E., Music, L., Ollivier, H.: Delegating multi-party
+  quantum computations vs. dishonest majority in two quantum rounds (2021)
+
+\bibitem{KMW17:quantum}
+Kashefi, E., Music, L., Wallden, P.: The quantum cut-and-choose technique and
+  quantum two-party computation (2017)
+
+\bibitem{KP17:multiparty}
+Kashefi, E., Pappa, A.: Multiparty delegated quantum computing. Cryptography
+  \textbf{1}(2),  1--20 (7 2017). \doi{10.3390/cryptography1020012}
+
+\bibitem{KW17:garbled}
+Kashefi, E., Wallden, P.: Garbled quantum computation. Cryptography
+  \textbf{1}(1), ~6 (2017)
+
+\bibitem{KW17:optimised}
+Kashefi, E., Wallden, P.: Optimised resource construction for verifiable
+  quantum computation. Journal of Physics A: Mathematical and Theoretical;
+  preprint arXiv:1510.07408  (2017),
+  \url{http://iopscience.iop.org/10.1088/1751-8121/aa5dac}
+
+\bibitem{LMKO21:verifying}
+Leichtle, D., Music, L., Kashefi, E., Ollivier, H.: Verifying bqp computations
+  on noisy devices with minimal overhead. Phys. Rev. X Quantum
+  \textbf{2}(040302) (2021)
+
+\bibitem{LRW20:secure}
+{Lipinska}, V., {Ribeiro}, J., {Wehner}, S.: {Secure multi-party quantum
+  computation with few qubits}. arXiv e-prints arXiv:2004.10486 (Apr 2020)
+
+\bibitem{MKAC+22:qenclave}
+Ma, Y., Kashefi, E., Arapinis, M., Chakraborty, K., Kaplan, M.: {QEnclave} -- a
+  practical solution for secure quantum cloud computing. npj Quantum
+  Information  \textbf{8}(1), ~128 (2022)
+
+\bibitem{M12:constructive-cryptography}
+Maurer, U.: Constructive cryptography -- a new paradigm for security
+  definitions and proofs. In: M{\"o}dersheim, S., Palamidessi, C. (eds.) Theory
+  of Security and Applications. pp. 33--56. Springer Berlin Heidelberg, Berlin,
+  Heidelberg (2012)
+
+\bibitem{MR11:abstract-cryptography}
+Maurer, U., Renner, R.: Abstract cryptography. In: Innovations in Computer
+  Science. pp. 1 -- 21. Tsinghua University Press (jan 2011),
+  \url{https://conference.iiis.tsinghua.edu.cn/ICS2011/content/papers/14.html}
+
+\bibitem{R99:codes}
+{Rains}, E.M.: Nonbinary quantum codes. IEEE Transactions on Information Theory
+   \textbf{45}(6),  1827--1832 (1999). \doi{10.1109/18.782103}
+
+\bibitem{RB01:one}
+Raussendorf, R., Briegel, H.J.: A one-way quantum computer. Phys. Rev. Lett.
+  \textbf{86},  5188--5191 (May 2001). \doi{10.1103/PhysRevLett.86.5188},
+  \url{http://link.aps.org/doi/10.1103/PhysRevLett.86.5188}
+
+\bibitem{U10:universally}
+Unruh, D.: Universally composable quantum multi-party computation. In: Gilbert,
+  H. (ed.) Advances in Cryptology -- EUROCRYPT 2010. pp. 486--505. Springer
+  Berlin Heidelberg, Berlin, Heidelberg (2010)
+
+\bibitem{Y86:how}
+Yao, A.: How to generate and exchange secrets. In: Foundations of Computer
+  Science, 1986., 27th Annual Symposium on. pp. 162--167. IEEE (1986)
+
+\end{thebibliography}

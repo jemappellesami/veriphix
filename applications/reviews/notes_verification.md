@@ -124,6 +124,10 @@ Quasi graph is:
 ```
 
 
+- Color-based approach: yields bipartite graph
+- random traps: works the same
+- dummyless: is it possible ?
+
 ### Arbitrary cliffords:
 - color-based traps: already mentioned, it is NP hard
 - Randomtraps: works
