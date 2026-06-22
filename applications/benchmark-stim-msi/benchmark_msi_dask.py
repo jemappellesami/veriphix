@@ -135,12 +135,44 @@ def add_depolarising_noise(g_circuit: stim.Circuit, p_depol: float) -> stim.Circ
     return out
 
 
-def _sample_subset(n_qubits: int, rng: Generator) -> list[int]:
-    """A random non-empty subset of ``[n_qubits]`` (the RandomTraps trap over [n+t])."""
-    bits = rng.integers(0, 2, size=n_qubits, dtype=bool)
-    if not bits.any():
-        bits[rng.integers(n_qubits)] = True
-    return [q for q in range(n_qubits) if bits[q]]
+def _sample_subsets(n_total: int, n_qubits: int, rng: Generator) -> np.ndarray:
+    """``n_total`` independent **uniform** non-empty subsets of ``[n_qubits]``.
+
+    Returns a boolean ``(n_total, n_qubits)`` membership matrix. Each row is drawn by
+    flipping ``n_qubits`` fair coins; the all-zeros (empty) outcome is *resampled* (true
+    rejection), so the distribution is exactly uniform over the ``2^N - 1`` non-empty
+    subsets -- not biased toward singletons (which forcing a single bit would do).
+    """
+    subsets = rng.integers(0, 2, size=(n_total, n_qubits), dtype=bool)
+    empty = np.flatnonzero(~subsets.any(axis=1))
+    while empty.size:
+        subsets[empty] = rng.integers(0, 2, size=(empty.size, n_qubits), dtype=bool)
+        empty = empty[~subsets[empty].any(axis=1)]
+    return subsets
+
+
+def _round_fails(
+    inv_tableau: stim.Tableau, noisy_g: stim.Circuit, n_qubits: int, n_total: int, rng: Generator
+) -> tuple[np.ndarray, int]:
+    """Faithful RandomTraps: a fresh uniform trap per round, exact (no reused pool).
+
+    Draws ``n_total`` independent uniform subsets (one per test round), then **groups
+    identical subsets** so each distinct trap circuit is compiled and sampled only once --
+    the result is exactly fresh-per-round uniform sampling, with compilation cost equal to
+    the number of *distinct* subsets drawn (~``n_total`` for large ``n+t``, fewer when
+    collisions are likely). Returns the per-round failure flags and the distinct-trap count.
+    """
+    subsets = _sample_subsets(n_total, n_qubits, rng)
+    keys = np.packbits(subsets, axis=1)  # one byte-key per row for grouping
+    groups: dict[bytes, list[int]] = {}
+    for i in range(n_total):
+        groups.setdefault(keys[i].tobytes(), []).append(i)
+
+    fails = np.empty(n_total, dtype=bool)
+    for idxs in groups.values():
+        trap = np.flatnonzero(subsets[idxs[0]]).tolist()
+        fails[idxs] = _trap_fail_pool(inv_tableau, noisy_g, n_qubits, trap, len(idxs))
+    return fails, len(groups)
 
 
 def _trap_fail_pool(
@@ -185,6 +217,7 @@ class CellResult:
     p_false_reject: float
     qubits: int = 0
     gates: int = 0
+    traps_compiled: int = 0
     build_s: float = 0.0
     sample_s: float = 0.0
     elapsed_s: float = 0.0
@@ -207,7 +240,7 @@ class Cell:
     """One ``(n, t, p_depol)`` tile -- the unit of Dask parallelism.
 
     Carries only serialisable scalars; the worker regenerates the fixed Clifford+MSI
-    circuit and the trap pool deterministically from ``base_seed`` via
+    circuit and the traps deterministically from ``base_seed`` via
     ``PCG64(base_seed).jumped(n*1009 + t)`` -- so the same circuit/traps are reused across
     noise levels, and only ``p_depol`` changes between cells of the same ``(n, t)``.
     """
@@ -230,21 +263,27 @@ class Cell:
             g_circuit, n_qubits = build_clifford_msi(self.n, self.t, self.clifford_depth, rng)
             inv_tableau = g_circuit.to_tableau().inverse()
             noisy_g = add_depolarising_noise(g_circuit, self.p_depol)
-            traps = [_sample_subset(n_qubits, rng) for _ in range(self.n_traps)]
             build_s = time.monotonic() - t_b0
 
             t_s0 = time.monotonic()
             n_total = self.n_shots * self.test_rounds
-            # Each round independently picks a trap from the pool (uniform), mirroring
-            # RandomTraps.sample_test_run. Sample each trap exactly as many times as drawn.
-            choice = rng.integers(0, self.n_traps, size=n_total)
-            fails = np.empty(n_total, dtype=bool)
-            for k, trap in enumerate(traps):
-                mask = choice == k
-                count = int(mask.sum())
-                if count:
-                    fails[mask] = _trap_fail_pool(inv_tableau, noisy_g, n_qubits, trap, count)
-            fails = fails.reshape(self.n_shots, self.test_rounds)
+            if self.n_traps <= 0:
+                # Default: exact fresh-per-round uniform RandomTraps.
+                flat, traps_compiled = _round_fails(inv_tableau, noisy_g, n_qubits, n_total, rng)
+            else:
+                # Opt-in fast approximation: draw a fixed pool of n_traps uniform subsets and
+                # assign each round one uniformly. Unbiased for p_failed_round; only an
+                # approximation for p_false_reject (finite pool correlates rounds within a shot).
+                pool = _sample_subsets(self.n_traps, n_qubits, rng)
+                choice = rng.integers(0, self.n_traps, size=n_total)
+                flat = np.empty(n_total, dtype=bool)
+                for k in range(self.n_traps):
+                    idxs = np.flatnonzero(choice == k)
+                    if idxs.size:
+                        trap = np.flatnonzero(pool[k]).tolist()
+                        flat[idxs] = _trap_fail_pool(inv_tableau, noisy_g, n_qubits, trap, idxs.size)
+                traps_compiled = self.n_traps
+            fails = flat.reshape(self.n_shots, self.test_rounds)
             sample_s = time.monotonic() - t_s0
 
             nr_failed = fails.sum(axis=1)
@@ -256,6 +295,7 @@ class Cell:
                 p_false_reject=float((nr_failed > self.threshold).mean()),
                 qubits=n_qubits,
                 gates=len(g_circuit),
+                traps_compiled=traps_compiled,
                 build_s=build_s,
                 sample_s=sample_s,
                 elapsed_s=time.monotonic() - t0,
@@ -333,7 +373,8 @@ def main(
     test_rounds:   Annotated[int, typer.Option(help="Test rounds per instance")] = 100,
     threshold:     Annotated[int, typer.Option(help="Tolerated failed test rounds (w)")] = 0,
     clifford_depth: Annotated[int, typer.Option(help="Brickwork depth of each Clifford layer C_i")] = 2,
-    n_traps:       Annotated[int, typer.Option(help="RandomTraps pool size (subset diversity)")] = 256,
+    n_traps:       Annotated[int, typer.Option(help="0 = exact fresh-per-round uniform traps (default); "
+                                                    ">0 = fast pooled approximation with that many traps")] = 0,
     out_dir:       Annotated[Path, typer.Option(help="Directory for per-(p_depol,shots) CSVs")] = Path("applications/benchmark-stim-msi"),
     seed:          Annotated[int, typer.Option()] = 42,
     walltime:      Annotated[int | None, typer.Option(help="SLURM: walltime in hours")] = None,
@@ -431,7 +472,8 @@ def main(
                     n_ok += 1
                     typer.echo(
                         f"  [{n_ok + n_fail}/{len(cells)}] n={report.n:>2} t={report.t:>2} "
-                        f"p={report.p_depol:.1e} qubits={report.qubits:>3} gates={report.gates:>5}  "
+                        f"p={report.p_depol:.1e} qubits={report.qubits:>3} gates={report.gates:>5} "
+                        f"traps={report.traps_compiled:>5}  "
                         f"build={report.build_s:.2f}s sample={report.sample_s:.2f}s "
                         f"cell={_fmt(report.elapsed_s)}  "
                         f"p_fail_round={report.p_failed_round:.4f} "
