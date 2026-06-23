@@ -1,26 +1,53 @@
 #!/usr/bin/env bash
-# Generate discrete heatmaps (p_failed_round with feasibility frontiers, and p_false_reject)
-# for every p_depol present in the Broadbent Clifford+MSI results CSV(s). Mirrors
-# applications/benchmark-stim/plot_results.sh.
+# Generate the p_failed_round heatmap (with feasibility frontiers) for the Broadbent
+# Clifford+MSI results, optionally selecting CSVs by SHOT COUNT.
 #
 # Usage:
-#   applications/benchmark-stim-msi-bro/plot_results.sh [csv] [outdir]
-# csv defaults to ALL benchmark_bro_results_p*_s*.csv in this folder; outdir defaults to
-# applications/benchmark-stim-msi-bro/heatmaps.
+#   applications/benchmark-stim-msi-bro/plot_results.sh [SHOTS] [OUTDIR]
+#
+#   SHOTS   shot count to plot (e.g. 100, 1000, 10000). Default: all shot counts.
+#   OUTDIR  output dir. Default: applications/benchmark-stim-msi-bro/heatmaps
+#
+# Examples:
+#   plot_results.sh                # every benchmark_bro_results_p*_s*.csv
+#   plot_results.sh 1000           # only the s1000 files (one figure per noise level)
+#   plot_results.sh 10000 /tmp/hm  # s10000 files, custom output dir
+#
+# One figure per (noise level, metric). Picks up all noise levels present for that shot count.
 set -euo pipefail
 
 HERE="applications/benchmark-stim-msi-bro"
-CSV="${1:-}"
+SHOTS="${1:-}"
 OUTDIR="${2:-$HERE/heatmaps}"
 
-CSV_ARG=()
-if [[ -n "$CSV" ]]; then
-    CSV_ARG=(--csv "$CSV")
+# Avoid the ~/.matplotlib LaTeX-cache PermissionError on this machine.
+export MPLCONFIGDIR="${MPLCONFIGDIR:-/tmp/mplconfig_bro}"
+mkdir -p "$MPLCONFIGDIR" "$OUTDIR"
+
+# Select CSVs: a specific shot count, or all of them.
+if [[ -n "$SHOTS" ]]; then
+    pattern="$HERE/benchmark_bro_results_p*_s${SHOTS}.csv"
+else
+    pattern="$HERE/benchmark_bro_results_p*_s*.csv"
 fi
 
-for metric in p_failed_round p_false_reject; do
-    ./.venv/bin/python "$HERE/plot_bro_heatmap.py" \
-        ${CSV_ARG[@]+"${CSV_ARG[@]}"} \
-        --metric "$metric" \
-        --outdir "$OUTDIR"
+# Build a comma-separated, non-empty CSV list (skip header-only files).
+csvs=()
+for f in $pattern; do
+    [[ -f "$f" ]] || continue
+    [[ $(wc -l < "$f") -gt 1 ]] || continue   # skip empty (header only)
+    csvs+=("$f")
 done
+
+if [[ ${#csvs[@]} -eq 0 ]]; then
+    echo "No non-empty CSVs matching: $pattern"
+    exit 1
+fi
+
+joined=$(IFS=,; echo "${csvs[*]}")
+echo "Plotting ${#csvs[@]} CSV(s)${SHOTS:+ for shots=$SHOTS} -> $OUTDIR"
+
+./.venv/bin/python "$HERE/plot_bro_heatmap.py" \
+    --csv "$joined" \
+    --metric p_failed_round \
+    --outdir "$OUTDIR"

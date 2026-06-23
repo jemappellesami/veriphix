@@ -57,13 +57,16 @@ def build_bro_circuit(
     p_hgadget: float = 0.3,
     p_msi: float = 0.15,
 ) -> tuple[stim.Circuit, int, list[int]]:
-    """Build a random **Broadbent-skeleton** Clifford+MSI circuit on ``width`` logical wires.
+    """Build a **Broadbent-skeleton** Clifford+MSI circuit on ``width`` logical wires.
 
-    Each of ``depth`` layers does, per logical wire, an optional **H-gadget** (prob.
-    ``p_hgadget``) or **MSI gadget** (prob. ``p_msi``), followed by a brickwork of ``CNOT``
-    entangling gates between neighbouring wires. ``holder[r]`` tracks the physical qubit that
-    currently carries logical role ``r`` (gadgets teleport the role onto a fresh ancilla),
-    mirroring ``applications/quasi_graph``'s ``build_broadbent``.
+    Each of ``depth`` layers places a **deterministic, fixed number** of gadgets --
+    ``round(p_hgadget*width)`` H-gadgets and ``round(p_msi*width)`` MSI gadgets, at positions
+    rotated by the layer index -- followed by a brickwork of ``CNOT`` entangling gates between
+    neighbouring wires. ``holder[r]`` tracks the physical qubit that currently carries logical
+    role ``r`` (gadgets teleport the role onto a fresh ancilla), mirroring
+    ``applications/quasi_graph``'s ``build_broadbent``. The fixed gadget count makes the circuit
+    *size* a smooth function of ``(width, depth)`` (see the loop below); ``p_hgadget``/``p_msi``
+    are now gadget **densities** (fraction of wires per layer), not per-wire probabilities.
 
     All gates are ``H`` and ``CNOT`` (the MSI ``SWAP`` is three ``CNOT``s), so the trap graph
     is bipartite (see module docstring). Returns ``(circuit, n_qubits, useful_qubits)`` where
@@ -100,12 +103,22 @@ def build_bro_circuit(
         holder[r] = a
         useful.append(a)
 
+    # Deterministic gadget counts per layer (NOT random per wire): a *fixed* number of
+    # H-/MSI-gadgets, placed at positions rotated by the layer index for variety. Fixing the
+    # count is what makes the wire/gate count -- hence the per-gate depolarising-noise exposure,
+    # hence p_failed_round -- a smooth, monotone function of (width, depth). A random per-wire
+    # coin (the old behaviour) made the circuit *size* random, giving a grainy heatmap and
+    # jagged feasibility frontiers. (`rng` still randomises CNOT orientation, which does not
+    # change the gate count, so circuits stay generic without size jitter.)
+    n_h = int(p_hgadget * width + 0.5)            # H-gadgets per layer  (round half up: monotone in width)
+    n_msi = int(p_msi * width + 0.5)              # MSI-gadgets per layer
     for layer in range(depth):
-        for r in range(width):
-            u = rng.random()
-            if u < p_hgadget:
+        base = layer % width
+        for j in range(min(n_h + n_msi, width)):  # at most one gadget per wire per layer
+            r = (base + j) % width
+            if j < n_h:
                 h_gadget(r)
-            elif u < p_hgadget + p_msi:
+            else:
                 msi_gadget(r)
         for i in range(layer % 2, width - 1, 2):  # brickwork CNOT entangling layer
             a, b = holder[i], holder[i + 1]
