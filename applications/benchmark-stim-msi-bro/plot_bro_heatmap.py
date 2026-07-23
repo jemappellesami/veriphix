@@ -53,7 +53,7 @@ if _USETEX:
 
 # ── Edit here instead of the command line ───────────────────────────────────────
 _HERE = Path(__file__).resolve().parent
-CSV_FILES = sorted(_HERE.glob("benchmark_bro_results_p*_s*.csv"))
+CSV_FILES = sorted(_HERE.glob("benchmark_bro_results_p*_[sr]*.csv"))
 AUTOFRONTIER = True
 AUTO_QUANTILES = [0.3, 0.5, 0.7]
 AUTO_N_GRID = list(range(500, 8001, 100))
@@ -63,6 +63,22 @@ BQP_ERROR = 0.1
 DETECTION_RATE = 0.5  # FK12-analogue bipartite traps: detection rate 1/2
 OUTDIR = _HERE / "heatmaps"
 ANNOTATE = False
+
+# Iso-contours of the metric itself, drawn on top of the heatmap. These are *not* the
+# feasibility frontiers: a frontier is a threshold derived from a verifier budget
+# (N, epsilon) and traces the staircase edge of the accepted tile set, whereas a contour is
+# a plain level set of the measured surface, interpolated between tile centres. 0.25 is
+# drawn in red as the reference level.
+CONTOUR_LEVELS = [0.1, 0.2, 0.25]
+CONTOUR_COLORS = {0.25: "red"}
+CONTOUR_STYLES = {0.1: "--", 0.2: "-.", 0.25: "-"}
+CONTOUR_DEFAULT_COLOR = "black"
+
+# Feasibility frontiers (the coloured per-(N, epsilon) staircases) are off by default: the
+# iso-contours above are what the plots are read for. The machinery below is kept and can
+# be switched back on with --frontiers. Leaving it off also skips the
+# maximize_robustness_under_budget search, which is the slow part of this script.
+DRAW_FRONTIERS = False
 # ─────────────────────────────────────────────────────────────────────────────
 
 _METRIC_LABEL = {
@@ -70,12 +86,20 @@ _METRIC_LABEL = {
     "p_false_reject": "Honest false-reject probability",
 }
 _CMAP_NAMES = ["Blues", "Greens", "Purples", "Oranges", "Greys"]
-_SHOTS_RE = re.compile(r"_s(\d+)")
+# ``_r<N>`` is the flat-round count (current runs); ``_s<N>`` the legacy
+# shots-per-instance count from before the shots x test_rounds collapse.
+_COUNT_RE = re.compile(r"_([sr])(\d+)")
+_COUNT_WORD = {"r": "rounds", "s": "shots"}
 
 
-def _shots_from_name(csv_path: Path) -> str:
-    m = _SHOTS_RE.search(csv_path.stem)
-    return m.group(1) if m else "NA"
+def _count_from_name(csv_path: Path) -> tuple[str, str]:
+    """``(kind, value)`` from a results filename: ``_r<N>`` rounds or legacy ``_s<N>`` shots.
+
+    The letter is carried through to the figure title and output filename so a plot of
+    legacy shots data is never mislabelled as (or overwritten by) a flat-rounds plot.
+    """
+    m = _COUNT_RE.search(csv_path.stem)
+    return (m.group(1), m.group(2)) if m else ("r", "NA")
 
 
 def _p_latex(p: float) -> str:
@@ -189,6 +213,37 @@ def _draw_frontiers(ax, grid: np.ndarray, frontiers: list[tuple[float, tuple, st
         ax.plot([x1, x2], [y1, y2], color=color, lw=lw, solid_capstyle="butt", zorder=5)
 
 
+def _draw_contours(ax, grid: np.ndarray, levels: list[float]) -> list[tuple[float, str]]:
+    """Overlay iso-lines of the metric; returns the (level, colour) pairs actually drawn.
+
+    Levels outside the observed range are skipped (``contour`` would silently draw nothing)
+    and reported, so a missing line is never mistaken for a line at the edge of the grid.
+    Contour coordinates are array indices, which is exactly what ``imshow`` uses for the
+    tile centres, so the two overlay without any extent juggling.
+    """
+    vals = grid[~np.isnan(grid)]
+    if not levels or vals.size == 0 or grid.shape[0] < 2 or grid.shape[1] < 2:
+        return []
+    lo, hi = float(vals.min()), float(vals.max())
+    drawn = sorted({lv for lv in levels if lo <= lv <= hi})
+    skipped = sorted(set(levels) - set(drawn))
+    if skipped:
+        print(f"   no contour for {skipped}: outside the data range [{lo:.4f}, {hi:.4f}]")
+    if not drawn:
+        return []
+    colors = [CONTOUR_COLORS.get(lv, CONTOUR_DEFAULT_COLOR) for lv in drawn]
+    cs = ax.contour(
+        grid,
+        levels=drawn,
+        colors=colors,
+        linestyles=[CONTOUR_STYLES.get(lv, "-") for lv in drawn],
+        linewidths=[2.0 if lv in CONTOUR_COLORS else 1.3 for lv in drawn],
+        zorder=6,
+    )
+    ax.clabel(cs, fmt={lv: f"{lv:g}" for lv in drawn}, fontsize=7, inline=True)
+    return list(zip(drawn, colors, strict=True))
+
+
 def _build_grid(sub: pd.DataFrame, metric: str) -> tuple[np.ndarray, list, list]:
     """Grid with depth on the x-axis and width (logical wires) on the y-axis."""
     depths = sorted(sub["depth"].unique())
@@ -206,18 +261,20 @@ def _plot_one(
     depths: list,
     widths: list,
     p_depol: float,
-    shots: str,
+    count: tuple[str, str],
     metric: str,
     bqp_error: float,
     frontiers: list[tuple[float, tuple, str]],
     outdir: Path,
     annotate: bool,
+    contour_levels: list[float],
 ) -> Path:
     vals = grid[~np.isnan(grid)]
     if frontiers:
         accepted = [(round(r, 4), float(np.mean(vals <= r)) if vals.size else 0.0, lbl) for r, _c, lbl in frontiers]
         print(
-            f"p_depol={_p_tag(p_depol)} shots={shots}: frontiers (max_rho, accepted_frac, label) = "
+            f"p_depol={_p_tag(p_depol)} {_COUNT_WORD[count[0]]}={count[1]}: "
+            f"frontiers (max_rho, accepted_frac, label) = "
             f"{[(r, round(f, 2), lbl) for r, f, lbl in accepted]}"
         )
 
@@ -235,7 +292,8 @@ def _plot_one(
     ax.set_ylabel(r"width (logical wires)")
     ax.set_title(
         rf"Noise impact on failure rate per circuit dimension "
-        rf"($p_{{\mathrm{{depol}}}}={_p_latex(p_depol)}$, $N_{{\mathrm{{shots}}}}={shots}$)"
+        rf"($p_{{\mathrm{{depol}}}}={_p_latex(p_depol)}$, "
+        rf"$N_{{\mathrm{{{_COUNT_WORD[count[0]]}}}}}={count[1]}$)"
     )
 
     if annotate:
@@ -245,15 +303,27 @@ def _plot_one(
                 text = "NA" if np.isnan(v) else (f"{v:.1e}" if 0 < v < 0.001 else f"{v:.3f}")
                 ax.text(j, i, text, ha="center", va="center", fontsize=6)
 
+    handles = []
     if frontiers:
         _draw_frontiers(ax, grid, frontiers)
-        handles = [mlines.Line2D([0], [0], color=c, lw=1.8, label=lbl) for _r, c, lbl in frontiers]
+        handles += [mlines.Line2D([0], [0], color=c, lw=1.8, label=lbl) for _r, c, lbl in frontiers]
+    handles += [
+        mlines.Line2D(
+            [0], [0],
+            color=color,
+            lw=2.0 if lv in CONTOUR_COLORS else 1.3,
+            linestyle=CONTOUR_STYLES.get(lv, "-"),
+            label=rf"$\rho={lv:g}$",
+        )
+        for lv, color in _draw_contours(ax, grid, contour_levels)
+    ]
+    if handles:
         ax.legend(handles=handles, loc="best", fontsize=7, framealpha=0.85)
 
     fig.colorbar(im, ax=ax, label=_METRIC_LABEL.get(metric, metric))
     plt.tight_layout()
 
-    outpath = outdir / f"discrete_{metric}_p{_p_tag(p_depol)}_s{shots}_bqp{bqp_error}.pdf"
+    outpath = outdir / f"discrete_{metric}_p{_p_tag(p_depol)}_{count[0]}{count[1]}_bqp{bqp_error}.pdf"
     fig.savefig(outpath)
     plt.close(fig)
     print(f"Saved -> {outpath}")
@@ -271,16 +341,25 @@ def main() -> None:
     parser.add_argument("--detection-rate", type=float, default=DETECTION_RATE)
     parser.add_argument("--outdir", default=None)
     parser.add_argument("--annotate", action="store_true", default=ANNOTATE)
+    parser.add_argument("--contours", default=None,
+                        help=f"Comma-separated iso-contour levels (default: {CONTOUR_LEVELS}); empty string disables.")
+    parser.add_argument("--frontiers", dest="frontiers", action="store_true", default=DRAW_FRONTIERS,
+                        help="Also draw the coloured per-(N, epsilon) feasibility staircases.")
+    parser.add_argument("--no-frontiers", dest="frontiers", action="store_false")
     parser.add_argument("--autofrontier", dest="autofrontier", action="store_true", default=AUTOFRONTIER)
     parser.add_argument("--no-autofrontier", dest="autofrontier", action="store_false")
     args = parser.parse_args()
 
     manual = args.N is not None or args.epsilon is not None
+    contour_levels = (
+        CONTOUR_LEVELS if args.contours is None
+        else [float(x) for x in args.contours.split(",") if x.strip()]
+    )
     csv_paths = CSV_FILES if args.csv is None else [Path(x.strip()) for x in args.csv.split(",") if x.strip()]
     outdir = Path(args.outdir) if args.outdir else OUTDIR
     outdir.mkdir(parents=True, exist_ok=True)
 
-    want_frontiers = args.metric == "p_failed_round"
+    want_frontiers = args.frontiers and args.metric == "p_failed_round"
     candidates = (
         _candidate_max_rhos(args.bqp_error, args.detection_rate)
         if (want_frontiers and args.autofrontier and not manual) else []
@@ -295,7 +374,7 @@ def main() -> None:
         if df.empty:
             print(f"!! skipping empty CSV: {csv_path}")
             continue
-        shots = _shots_from_name(csv_path)
+        count = _count_from_name(csv_path)
         p_depols = sorted(df["p_depol"].unique()) if args.p_depol is None else [args.p_depol]
         for p_depol in p_depols:
             sub = df[df["p_depol"] == p_depol]
@@ -312,7 +391,8 @@ def main() -> None:
             else:
                 frontiers = _auto_frontier_configs(grid, candidates)
 
-            _plot_one(grid, depths, widths, p_depol, shots, args.metric, args.bqp_error, frontiers, outdir, args.annotate)
+            _plot_one(grid, depths, widths, p_depol, count, args.metric, args.bqp_error,
+                      frontiers, outdir, args.annotate, contour_levels)
 
 
 if __name__ == "__main__":

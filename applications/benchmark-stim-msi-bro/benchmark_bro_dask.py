@@ -12,12 +12,28 @@ Per cell (deterministic from ``base_seed`` via ``PCG64(seed).jumped(width*1009+d
   * ``fk12_bro_test_runs(G, N)`` -> exactly two test runs (asserts bipartite);
   * for each test run, prepare the merged ``+1`` eigenstate, apply ``G`` with depolarising
     noise, measure all wires, fail iff any trap outcome differs from its expected value;
-  * each round picks one of the two runs uniformly (FK12); fold into ``p_failed_round`` /
-    ``p_false_reject`` with threshold ``w`` -- so only **2 compiled circuits per cell** and
-    shots are effectively free (unlike RandomTraps in ``benchmark-stim-msi``).
+  * each round picks one of the two runs uniformly (FK12) -- so only **2 compiled circuits
+    per cell** and rounds are effectively free (unlike RandomTraps in ``benchmark-stim-msi``).
 
-CSV columns ``p_depol,width,depth,p_failed_round,p_false_reject`` (one file per
-``(p_depol, shots)``; resume per file).
+Flat rounds, analytic false-reject
+----------------------------------
+A cell samples a single flat pool of ``--rounds`` honest test rounds; there is no
+``shots x test_rounds`` grouping. The rounds are i.i.d.: the circuit, the traps and the
+noise model are fixed per cell, ``test_run_fail_pool`` draws independent Stim shots, and
+the secrets are all-``False`` (a secret would be a per-instance random variable, breaking
+independence -- and a non-Clifford one at that, which Stim could not simulate). So the
+failure *count* ``n_fail`` out of ``n_rounds`` is a sufficient statistic, and
+
+    p_false_reject = P[Binom(R, p_failed_round) > w]
+
+is exact in expectation for any ``(R, w)``. Reporting it analytically from the whole pool
+is strictly tighter than the old empirical estimate over ``shots`` instances (built from
+only ``shots`` independent samples, and saturating at 1.0 as soon as ``p_failed_round``
+exceeded a few 1e-3), and it lets ``--test-rounds`` / ``--threshold`` be re-swept post-hoc
+from the recorded ``n_fail,n_rounds`` -- no re-simulation.
+
+CSV columns ``p_depol,width,depth,p_failed_round,p_false_reject,n_fail,n_rounds`` (one file
+per ``(p_depol, rounds)``; resume per file).
 
 Usage -- local (LocalCluster):
     python applications/benchmark-stim-msi-bro/benchmark_bro_dask.py --widths 2,3,4 --depths 2,4
@@ -44,6 +60,7 @@ import numpy as np
 import typer
 from dask_jobqueue import SLURMCluster
 from numpy.random import PCG64, Generator
+from scipy.stats import binom
 
 # The FK12-analogue core is vendored next to this script (not pip-installed); ship it to
 # workers via upload_file in main(), and put it on sys.path here for local runs.
@@ -55,7 +72,18 @@ app = typer.Typer(add_completion=False)
 logging.getLogger("distributed.comm").setLevel(logging.CRITICAL)
 logging.getLogger("distributed.client").setLevel(logging.CRITICAL)
 
-CSV_FIELDS = ["p_depol", "width", "depth", "p_failed_round", "p_false_reject"]
+# p_failed_round / p_false_reject stay first so the existing heatmap scripts keep working;
+# n_fail,n_rounds are appended so any (R, w) can be recomputed from the CSV alone.
+CSV_FIELDS = ["p_depol", "width", "depth", "p_failed_round", "p_false_reject", "n_fail", "n_rounds"]
+
+
+def false_reject(p_failed_round: float, test_rounds: int, threshold: int) -> float:
+    """``P[Binom(test_rounds, p_failed_round) > threshold]`` -- the honest false-reject rate.
+
+    Exact given i.i.d. rounds (see the module docstring), so it is derived from the pooled
+    estimate rather than re-estimated from a handful of grouped instances.
+    """
+    return float(binom.sf(threshold, test_rounds, p_failed_round))
 
 
 # ── result types ─────────────────────────────────────────────────────────────────
@@ -66,13 +94,17 @@ class CellResult:
     p_depol: float
     width: int
     depth: int
-    p_failed_round: float
-    p_false_reject: float
+    n_fail: int
+    n_rounds: int
     qubits: int = 0
     gates: int = 0
     build_s: float = 0.0
     sample_s: float = 0.0
     elapsed_s: float = 0.0
+
+    @property
+    def p_failed_round(self) -> float:
+        return self.n_fail / self.n_rounds
 
 
 @dataclass(frozen=True)
@@ -94,9 +126,7 @@ class Cell:
     width: int
     depth: int
     p_depol: float
-    n_shots: int
-    test_rounds: int
-    threshold: int
+    n_rounds: int
     p_hgadget: float
     p_msi: float
     base_seed: int
@@ -114,25 +144,25 @@ class Cell:
             build_s = time.monotonic() - t_b0
 
             t_s0 = time.monotonic()
-            n_total = self.n_shots * self.test_rounds
-            # FK12: each round picks one of the two test runs uniformly. Sample each run
-            # exactly as many times as drawn -> 2 compiled circuits per cell, shots cheap.
-            pools = [test_run_fail_pool(run, noisy_g, n_qubits, n_total) for run in test_runs]
-            choice = rng.integers(0, len(pools), size=n_total)
-            fails = np.empty(n_total, dtype=bool)
-            for k, pool in enumerate(pools):
-                mask = choice == k
-                fails[mask] = pool[: int(mask.sum())]
-            fails = fails.reshape(self.n_shots, self.test_rounds)
+            # FK12: each round picks one of the two test runs uniformly. Draw the
+            # multinomial split first, then sample each run *exactly* as many times as it
+            # was drawn -> 2 compiled circuits per cell and no wasted shots (the previous
+            # version sampled n_total per run and threw away half).
+            counts = np.bincount(
+                rng.integers(0, len(test_runs), size=self.n_rounds), minlength=len(test_runs)
+            )
+            n_fail = 0
+            for run, count in zip(test_runs, counts, strict=True):
+                if count:
+                    n_fail += int(test_run_fail_pool(run, noisy_g, n_qubits, int(count)).sum())
             sample_s = time.monotonic() - t_s0
 
-            nr_failed = fails.sum(axis=1)
             return CellResult(
                 p_depol=self.p_depol,
                 width=self.width,
                 depth=self.depth,
-                p_failed_round=float(fails.mean()),
-                p_false_reject=float((nr_failed > self.threshold).mean()),
+                n_fail=n_fail,
+                n_rounds=self.n_rounds,
                 qubits=n_qubits,
                 gates=len(g_circuit),
                 build_s=build_s,
@@ -177,8 +207,10 @@ def _load_done(path: Path) -> set[tuple[str, str, str]]:
         return {(row["p_depol"], row["width"], row["depth"]) for row in csv.DictReader(f)}
 
 
-def _csv_path(out_dir: Path, p_depol: float, shots: int) -> Path:
-    return out_dir / f"benchmark_bro_results_p{p_depol:.1e}_s{shots}.csv"
+def _csv_path(out_dir: Path, p_depol: float, rounds: int) -> Path:
+    # ``_r`` (not the legacy ``_s``) so flat-round files never append into, or get read as,
+    # a pre-collapse ``_s<shots>`` file whose rows meant shots x test_rounds.
+    return out_dir / f"benchmark_bro_results_p{p_depol:.1e}_r{rounds}.csv"
 
 
 def _parse_ints(text: str) -> list[int]:
@@ -202,9 +234,9 @@ def main(
     widths:      Annotated[str, typer.Option(help="Comma-separated widths (logical wires)")] = "4,6,8",
     depths:      Annotated[str, typer.Option(help="Comma-separated depths (layers)")] = "4,8,12",
     depols:      Annotated[str, typer.Option(help="Comma-separated depolarising probs")] = "1e-3",
-    shots:       Annotated[int, typer.Option(help="Verification instances per cell")] = 100,
-    test_rounds: Annotated[int, typer.Option(help="Test rounds per instance")] = 100,
-    threshold:   Annotated[int, typer.Option(help="Tolerated failed test rounds (w)")] = 0,
+    rounds:      Annotated[int, typer.Option(help="Honest test rounds sampled per cell (flat pool)")] = 10000,
+    test_rounds: Annotated[int, typer.Option(help="Report-only: rounds per verification instance (R)")] = 100,
+    threshold:   Annotated[int, typer.Option(help="Report-only: tolerated failed test rounds (w)")] = 0,
     p_hgadget:   Annotated[float, typer.Option(help="Per-(wire,layer) prob. of an H-gadget")] = 0.3,
     p_msi:       Annotated[float, typer.Option(help="Per-(wire,layer) prob. of an MSI gadget")] = 0.15,
     out_dir:     Annotated[Path, typer.Option()] = Path("applications/benchmark-stim-msi-bro"),
@@ -218,7 +250,7 @@ def main(
 ) -> None:
     """Sweep (width, depth) x p_depol across a Dask cluster; write the honest-failure CSV(s)."""
     if smoke:
-        widths, depths, depols, shots, test_rounds = "2,3", "2,3", "1e-2", 20, 20
+        widths, depths, depols, rounds = "2,3", "2,3", "1e-2", 400
 
     width_list = _parse_ints(widths)
     depth_list = _parse_ints(depths)
@@ -226,15 +258,15 @@ def main(
 
     dims = [(w, d) for d in depth_list for w in width_list]
     cells = [
-        Cell(width=w, depth=d, p_depol=p, n_shots=shots, test_rounds=test_rounds,
-             threshold=threshold, p_hgadget=p_hgadget, p_msi=p_msi, base_seed=seed)
+        Cell(width=w, depth=d, p_depol=p, n_rounds=rounds,
+             p_hgadget=p_hgadget, p_msi=p_msi, base_seed=seed)
         for (w, d) in dims
         for p in depol_list
     ]
     n_cells_total = len(cells)
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    paths = {p: _csv_path(out_dir, p, shots) for p in depol_list}
+    paths = {p: _csv_path(out_dir, p, rounds) for p in depol_list}
     done = {p: _load_done(path) for p, path in paths.items()}
     n_existing = sum(len(d) for d in done.values())
     if n_existing:
@@ -246,8 +278,10 @@ def main(
 
     typer.echo(
         f"grid: {len(width_list)} widths x {len(depth_list)} depths x {len(depol_list)} noise levels "
-        f"= {n_cells_total} cells ({len(cells)} to run); shots={shots}, test_rounds={test_rounds}, "
-        f"p_hgadget={p_hgadget}, p_msi={p_msi}"
+        f"= {n_cells_total} cells ({len(cells)} to run); rounds={rounds}/cell, "
+        f"p_hgadget={p_hgadget}, p_msi={p_msi}\n"
+        f"reporting p_false_reject = P[Binom(R={test_rounds}, p_failed_round) > w={threshold}] "
+        f"(analytic; re-derivable from n_fail,n_rounds for any R,w)"
     )
     if not cells:
         typer.echo("Nothing to do -- all cells already present.")
@@ -291,10 +325,12 @@ def main(
                 eta = elapsed / done_count * (len(cells) - done_count)
 
                 if isinstance(report, CellResult):
+                    p_fr = false_reject(report.p_failed_round, test_rounds, threshold)
                     fh, writer = writers[report.p_depol]
                     writer.writerow({
                         "p_depol": report.p_depol, "width": report.width, "depth": report.depth,
-                        "p_failed_round": report.p_failed_round, "p_false_reject": report.p_false_reject,
+                        "p_failed_round": report.p_failed_round, "p_false_reject": p_fr,
+                        "n_fail": report.n_fail, "n_rounds": report.n_rounds,
                     })
                     fh.flush()
                     n_ok += 1
@@ -302,8 +338,9 @@ def main(
                         f"  [{n_ok + n_fail}/{len(cells)}] w={report.width:>2} d={report.depth:>2} "
                         f"p={report.p_depol:.1e} wires={report.qubits:>4} gates={report.gates:>5}  "
                         f"build={report.build_s:.2f}s sample={report.sample_s:.2f}s "
-                        f"cell={_fmt(report.elapsed_s)}  p_fail_round={report.p_failed_round:.4f} "
-                        f"p_false_reject={report.p_false_reject:.3f}  ETA {_fmt(eta)}"
+                        f"cell={_fmt(report.elapsed_s)}  "
+                        f"p_fail_round={report.p_failed_round:.6f} ({report.n_fail}/{report.n_rounds}) "
+                        f"p_false_reject={p_fr:.3f}  ETA {_fmt(eta)}"
                     )
                 else:
                     n_fail += 1

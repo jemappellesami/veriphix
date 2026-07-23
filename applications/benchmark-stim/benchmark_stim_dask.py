@@ -1,8 +1,8 @@
 """Cluster-parallel version of ``benchmark_stim.py`` (Dask + SLURM).
 
-Same honest-failure / feasibility-region pipeline and **identical CSV columns** as
-``benchmark_stim.py`` (``p_ent,width,depth,p_failed_round,p_false_reject``), so
-``applications/plot_veriphix_heatmaps.py`` plots the output unchanged.
+Same honest-failure / feasibility-region pipeline as ``benchmark_stim.py``. The CSV leads
+with the same columns (``p_ent,width,depth,p_failed_round,p_false_reject``) and appends
+``n_fail,n_rounds``, so ``applications/plot_veriphix_heatmaps.py`` plots it unchanged.
 
 The key observation that makes this embarrassingly parallel: the circuits are **not**
 files on disk — each ``(width, depth)`` tile regenerates its own fixed Clifford circuit
@@ -15,6 +15,23 @@ and the old ACES driver, which fan out one Dask future per circuit/order.
 Each cell is submitted as an independent future; results are written to CSV as futures
 complete (not in submission order), and an existing CSV is used to **resume** — already
 computed ``(p_ent, width, depth)`` cells are skipped.
+
+Flat rounds, analytic false-reject
+----------------------------------
+A cell samples a single flat pool of ``--rounds`` honest test rounds; there is no
+``shots x test_rounds`` grouping. The rounds are i.i.d.: the pattern, the colouring and
+the noise model are fixed per cell, ``_round_fail_pool`` draws independent Stim shots, and
+the secrets are all-``False`` (a secret would be a per-instance random variable, breaking
+independence — and a non-Clifford one at that, which Stim could not simulate). So the
+failure *count* ``n_fail`` out of ``n_rounds`` is a sufficient statistic, and
+
+    p_false_reject = P[Binom(R, p_failed_round) > w]
+
+is exact in expectation for any ``(R, w)``. Reporting it analytically from the whole pool
+is strictly tighter than the old empirical estimate over ``shots`` instances (built from
+only ``shots`` independent samples, and saturating at 1.0 as soon as ``p_failed_round``
+exceeded a few 1e-3), and it lets ``--test-rounds`` / ``--threshold`` be re-swept post-hoc
+from the recorded ``n_fail,n_rounds`` — no re-simulation.
 
 Usage — local (LocalCluster, uses all CPU cores)
 -------------------------------------------------
@@ -30,7 +47,6 @@ Usage — SLURM cluster
 from __future__ import annotations
 
 import csv
-import dataclasses
 import logging
 import sys
 import time
@@ -49,6 +65,7 @@ from graphix import Pattern, command
 from graphix.command import CommandKind
 from graphix.sim.statevec import Statevec
 from numpy.random import PCG64, Generator
+from scipy.stats import binom
 
 from veriphix.blinding import Secrets
 from veriphix.client import Client
@@ -76,9 +93,19 @@ app = typer.Typer(add_completion=False)
 logging.getLogger("distributed.comm").setLevel(logging.CRITICAL)
 logging.getLogger("distributed.client").setLevel(logging.CRITICAL)
 
-# CSV columns are frozen to match benchmark_stim.py / the heatmap plotter. The shot count
-# is encoded in the output *filename* (one file per precision), not a column.
-CSV_FIELDS = ["p_ent", "width", "depth", "p_failed_round", "p_false_reject"]
+# The first five columns are frozen to match benchmark_stim.py / the heatmap plotter; the
+# round count is encoded in the output *filename* (one file per precision). n_fail,n_rounds
+# are appended so any (R, w) can be recomputed from the CSV alone.
+CSV_FIELDS = ["p_ent", "width", "depth", "p_failed_round", "p_false_reject", "n_fail", "n_rounds"]
+
+
+def false_reject(p_failed_round: float, test_rounds: int, threshold: int) -> float:
+    """``P[Binom(test_rounds, p_failed_round) > threshold]`` — the honest false-reject rate.
+
+    Exact given i.i.d. rounds (see the module docstring), so it is derived from the pooled
+    estimate rather than re-estimated from a handful of grouped instances.
+    """
+    return float(binom.sf(threshold, test_rounds, p_failed_round))
 
 
 # ── helpers (copied from benchmark_stim.py so the worker is self-contained) ──────
@@ -178,13 +205,17 @@ class CellResult:
     p_ent: float
     width: int
     depth: int
-    p_failed_round: float
-    p_false_reject: float
+    n_fail: int
+    n_rounds: int
     nodes: int = 0
     edges: int = 0
     build_s: float = 0.0
     sample_s: float = 0.0
     elapsed_s: float = 0.0  # wall-time for this cell; not written to CSV
+
+    @property
+    def p_failed_round(self) -> float:
+        return self.n_fail / self.n_rounds
 
 
 @dataclass(frozen=True)
@@ -210,9 +241,7 @@ class Cell:
     width: int
     depth: int
     p_ent: float
-    n_shots: int
-    test_rounds: int
-    threshold: int
+    n_rounds: int
     base_seed: int
 
     def execute(self) -> CellResult | CellFailure:
@@ -242,26 +271,28 @@ class Cell:
             build_s = time.monotonic() - t_b0
 
             t_s0 = time.monotonic()
-            n_total = self.n_shots * self.test_rounds
             noise_model = UncorrelatedDepolarisingNoiseModel(entanglement_error_prob=self.p_ent)
-            pools = [_round_fail_pool(run, stim_pattern, noise_model, n_total) for run in test_runs]
-
             # Each round independently picks a test run (FK12.sample_test_run is uniform).
-            choice = rng.integers(0, len(pools), size=n_total)
-            fails = np.empty(n_total, dtype=bool)
-            for k, pool in enumerate(pools):
-                mask = choice == k
-                fails[mask] = pool[: int(mask.sum())]
-            fails = fails.reshape(self.n_shots, self.test_rounds)
+            # Draw the multinomial split first, then sample each run *exactly* as many times
+            # as it was drawn — one compiled circuit per colour and no wasted shots (the
+            # previous version sampled n_total per colour and threw all but ~1/k away).
+            counts = np.bincount(
+                rng.integers(0, len(test_runs), size=self.n_rounds), minlength=len(test_runs)
+            )
+            n_fail = 0
+            for run, count in zip(test_runs, counts, strict=True):
+                if count:
+                    n_fail += int(
+                        _round_fail_pool(run, stim_pattern, noise_model, int(count)).sum()
+                    )
             sample_s = time.monotonic() - t_s0
 
-            nr_failed = fails.sum(axis=1)
             return CellResult(
                 p_ent=self.p_ent,
                 width=self.width,
                 depth=self.depth,
-                p_failed_round=float(fails.mean()),
-                p_false_reject=float((nr_failed > self.threshold).mean()),
+                n_fail=n_fail,
+                n_rounds=self.n_rounds,
                 nodes=int(pattern.n_node),
                 edges=int(sum(1 for c in pattern if c.kind == CommandKind.E)),
                 build_s=build_s,
@@ -319,9 +350,13 @@ def _load_done(path: Path) -> set[tuple[str, str, str]]:
         return {(row["p_ent"], row["width"], row["depth"]) for row in csv.DictReader(f)}
 
 
-def _csv_path(out_dir: Path, p_ent: float, shots: int) -> Path:
-    """Per-(noise level, precision) output file: both p_ent and shots pin the filename."""
-    return out_dir / f"benchmark_stim_results_p{p_ent:.1e}_s{shots}.csv"
+def _csv_path(out_dir: Path, p_ent: float, rounds: int) -> Path:
+    """Per-(noise level, precision) output file: both p_ent and rounds pin the filename.
+
+    ``_r`` (not the legacy ``_s``) so flat-round files never append into, or get read as, a
+    pre-collapse ``_s<shots>`` file whose rows meant shots x test_rounds.
+    """
+    return out_dir / f"benchmark_stim_results_p{p_ent:.1e}_r{rounds}.csv"
 
 
 def _parse_ints(text: str) -> list[int]:
@@ -375,10 +410,10 @@ def main(
     widths:      Annotated[str, typer.Option(help="Comma-separated widths")] = "8,9,10",
     depths:      Annotated[str, typer.Option(help="Comma-separated depths")] = "16",
     ent_errors:  Annotated[str, typer.Option(help="Comma-separated entanglement error probs")] = "1e-3",
-    shots:       Annotated[int, typer.Option()] = 100,
-    test_rounds: Annotated[int, typer.Option()] = 100,
-    threshold:   Annotated[int, typer.Option()] = 0,
-    out_dir:     Annotated[Path, typer.Option(help="Directory for per-(p_ent,shots) CSVs")] = Path("applications/benchmark-stim"),
+    rounds:      Annotated[int, typer.Option(help="Honest test rounds sampled per cell (flat pool)")] = 10000,
+    test_rounds: Annotated[int, typer.Option(help="Report-only: rounds per verification instance (R)")] = 100,
+    threshold:   Annotated[int, typer.Option(help="Report-only: tolerated failed test rounds (w)")] = 0,
+    out_dir:     Annotated[Path, typer.Option(help="Directory for per-(p_ent,rounds) CSVs")] = Path("applications/benchmark-stim"),
     seed:        Annotated[int, typer.Option()] = 42,
     walltime:    Annotated[int | None, typer.Option(help="SLURM: walltime in hours")] = None,
     memory:      Annotated[int | None, typer.Option(help="SLURM: memory in GB")] = None,
@@ -389,7 +424,7 @@ def main(
 ) -> None:
     """Sweep (width, depth) x p_ent across a Dask cluster; write the honest-failure CSV."""
     if smoke:
-        widths, depths, ent_errors, shots, test_rounds = "2,3", "2,3", "1e-2", 20, 20
+        widths, depths, ent_errors, rounds = "2,3", "2,3", "1e-2", 400
 
     width_list = _parse_ints(widths)
     depth_list = _parse_ints(depths)
@@ -403,9 +438,7 @@ def main(
             width=w,
             depth=d,
             p_ent=p,
-            n_shots=shots,
-            test_rounds=test_rounds,
-            threshold=threshold,
+            n_rounds=rounds,
             base_seed=seed,
         )
         for (w, d) in dims
@@ -413,9 +446,9 @@ def main(
     ]
     n_cells_total = len(cells)
 
-    # One CSV per noise level (named by p_ent and shots). Resume is per file.
+    # One CSV per noise level (named by p_ent and rounds). Resume is per file.
     out_dir.mkdir(parents=True, exist_ok=True)
-    paths = {p: _csv_path(out_dir, p, shots) for p in ent_list}
+    paths = {p: _csv_path(out_dir, p, rounds) for p in ent_list}
     done = {p: _load_done(path) for p, path in paths.items()}
     n_existing = sum(len(d) for d in done.values())
     if n_existing:
@@ -436,8 +469,9 @@ def main(
 
     typer.echo(
         f"grid: {len(width_list)} widths x {len(depth_list)} depths x {len(ent_list)} noise levels "
-        f"= {n_cells_total} cells ({len(cells)} to run); "
-        f"shots={shots}, test_rounds={test_rounds} ({shots * test_rounds} samples/colour)"
+        f"= {n_cells_total} cells ({len(cells)} to run); rounds={rounds}/cell\n"
+        f"reporting p_false_reject = P[Binom(R={test_rounds}, p_failed_round) > w={threshold}] "
+        f"(analytic; re-derivable from n_fail,n_rounds for any R,w)"
     )
     if not cells:
         typer.echo("Nothing to do — all cells already present.")
@@ -512,6 +546,7 @@ def main(
                 )
 
                 if isinstance(report, CellResult):
+                    p_fr = false_reject(report.p_failed_round, test_rounds, threshold)
                     fh, writer = writers[report.p_ent]
                     writer.writerow(
                         {
@@ -519,7 +554,9 @@ def main(
                             "width": report.width,
                             "depth": report.depth,
                             "p_failed_round": report.p_failed_round,
-                            "p_false_reject": report.p_false_reject,
+                            "p_false_reject": p_fr,
+                            "n_fail": report.n_fail,
+                            "n_rounds": report.n_rounds,
                         }
                     )
                     fh.flush()
@@ -537,8 +574,8 @@ def main(
                         f"p={report.p_ent:.1e} |V|={report.nodes:>4} |E|={report.edges:>4}  "
                         f"build={report.build_s:.2f}s sample={report.sample_s:.2f}s "
                         f"cell={_fmt(report.elapsed_s)}  "
-                        f"p_fail_round={report.p_failed_round:.4f} "
-                        f"p_false_reject={report.p_false_reject:.3f}  ETA {eta_str}"
+                        f"p_fail_round={report.p_failed_round:.6f} ({report.n_fail}/{report.n_rounds}) "
+                        f"p_false_reject={p_fr:.3f}  ETA {eta_str}"
                     )
                 elif isinstance(report, CellFailure):
                     n_fail += 1
