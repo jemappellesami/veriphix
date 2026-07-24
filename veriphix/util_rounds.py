@@ -426,6 +426,85 @@ def maximize_robustness_under_budget_over_lambda(
     return best
 
 
+def min_epsilon_under_budget(
+    c: float,
+    detection_rate: float,
+    budget: int,
+    rho_min: float,
+    lambda_phi: float | None = None,
+    n_grid_delta: int = 300,
+    n_grid_lambda: int = 11,
+    epsilon_lo: float = 1e-15,
+    epsilon_hi: float = 0.5,
+    tol_log10: float = 0.01,
+) -> DesignResult:
+    """Smallest security target reachable with d+s <= budget while tolerating w/s >= rho_min.
+
+    The dual of ``optimize_with_robustness_constraint*``: instead of fixing epsilon and paying
+    whatever rounds it costs, fix the round budget and ask how much security it buys. This is
+    the cost-driven reading of the benchmark, with rho_min set to the device's measured
+    honest failure rate.
+
+    Feasibility is monotone in the target (a looser target only ever admits more designs), so
+    the minimum is found by bisecting on log10(epsilon). ``lambda_phi=None`` optimises over
+    lambda, otherwise lambda is held fixed.
+
+    Raises RuntimeError if no design fits the budget even at ``epsilon_hi`` -- which is the
+    generic situation once rho_min approaches alpha * detection_rate, where the round count
+    diverges.
+    """
+    if not (0.0 < epsilon_lo < epsilon_hi < 1.0):
+        raise ValueError("Need 0 < epsilon_lo < epsilon_hi < 1.")
+    if budget <= 0:
+        raise ValueError("Need budget >= 1.")
+
+    def best_design(epsilon_target: float) -> DesignResult | None:
+        try:
+            if lambda_phi is None:
+                res = maximize_robustness_under_budget_over_lambda(
+                    c=c,
+                    detection_rate=detection_rate,
+                    epsilon_target=epsilon_target,
+                    budget=budget,
+                    n_grid_delta=n_grid_delta,
+                    n_grid_lambda=n_grid_lambda,
+                )
+            else:
+                res = maximize_robustness_under_budget(
+                    c=c,
+                    detection_rate=detection_rate,
+                    epsilon_target=epsilon_target,
+                    budget=budget,
+                    lambda_phi=lambda_phi,
+                    n_grid=n_grid_delta,
+                )
+        except (ValueError, RuntimeError):
+            return None
+        return res if res.w_over_s >= rho_min else None
+
+    best = best_design(epsilon_hi)
+    if best is None:
+        raise RuntimeError(f"No design with d+s <= {budget} tolerates w/s >= {rho_min:.6g}.")
+
+    at_lo = best_design(epsilon_lo)
+    if at_lo is not None:
+        at_lo.epsilon_target = epsilon_lo
+        return at_lo
+
+    log_lo, log_hi = math.log10(epsilon_lo), math.log10(epsilon_hi)
+    while log_hi - log_lo > tol_log10:
+        mid = 0.5 * (log_lo + log_hi)
+        res = best_design(10.0**mid)
+        if res is None:
+            log_lo = mid
+        else:
+            log_hi = mid
+            best = res
+
+    best.epsilon_target = 10.0**log_hi
+    return best
+
+
 if __name__ == "__main__":
     c = 0
     detection_rate = 0.5  # FK12 / RandomTraps: detection_rate = 1/2

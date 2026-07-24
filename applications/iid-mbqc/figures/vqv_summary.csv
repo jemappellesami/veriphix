@@ -1,0 +1,3 @@
+csv,noise,target_frac,q_crit,n_pass,frac_pass,max_width,max_depth,max_area,max_square,d_at_eps_1e-02,d_at_eps_1e-04,d_at_eps_1e-06,d_at_eps_1e-09
+mbqc_iid.csv,0.001,0.2,0.09333549790665278,17,0.20987654320987653,7,8,16,3,11,29,45,73
+mbqc_iid.csv,0.001,0.4,0.13984754252591622,33,0.4074074074074074,10,10,25,5,25,65,105,167
