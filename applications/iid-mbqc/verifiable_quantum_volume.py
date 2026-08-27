@@ -74,7 +74,7 @@ if _USETEX:
     matplotlib.rcParams["text.latex.preamble"] = r"\usepackage{amssymb}\usepackage{amsmath}"
 
 _HERE = Path(__file__).resolve().parent
-DEFAULT_CSV = _HERE / "results" / "mbqc_iid.csv"
+DEFAULT_CSV = _HERE / "results" / "mbqc_iid_p1.0e-03_r2000.csv"
 OUTDIR = _HERE / "figures"
 
 # The worked example: certify this share of the measured grid, then price it.
