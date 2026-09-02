@@ -1,8 +1,2 @@
 graphix>=0.4
 stim>=1.13,<2
-
-# For sampling circuits
-gitpython
-qiskit
-qiskit_aer
-typer
