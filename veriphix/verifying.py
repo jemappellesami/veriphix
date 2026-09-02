@@ -17,8 +17,6 @@ Traps = AbstractSet[Trap]
 
 
 if TYPE_CHECKING:
-    from typing import Literal
-
     from graphix.measurements import Outcome
     from graphix.noise_models import NoiseModel
     from graphix.sim.base_backend import Backend
