@@ -110,16 +110,14 @@ def generate_eigenstate(stabilizer: PauliString) -> list[PlanarState]:
 
 
 class TestRun(Run):
-    meas_basis: Literal["_", "I", "X", "Y", "Z"]
     # Whether each trap's own conjugated stabilizer carries a -1 sign.
     trap_signs: dict[Trap, bool]
 
     __test__ = False  # this is not a pytest test-suite
 
-    def __init__(self, client: Client, traps: Traps, meas_basis: Literal["_", "I", "X", "Y", "Z"] = "X") -> None:
+    def __init__(self, client: Client, traps: Traps) -> None:
         super().__init__(client=client)
         self.traps = frozenset(traps)
-        self.meas_basis = meas_basis
         self.clifford_structure = client.clifford_structure
         self.nqubits = len(self.clifford_structure)
         self.stabilizer = self.build_common_stabilizer()
@@ -130,7 +128,7 @@ class TestRun(Run):
         # and conjugate each of them.
         conjugated_measurements = {
             trap: self.clifford_structure.inverse()(
-                PauliString([self.meas_basis if i in trap else "I" for i in range(self.nqubits)])
+                PauliString(["X" if i in trap else "I" for i in range(self.nqubits)])
             )
             for trap in self.traps
         }
