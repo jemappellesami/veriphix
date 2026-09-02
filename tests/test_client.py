@@ -14,7 +14,7 @@ from typing_extensions import override
 
 from veriphix.blinding import Secrets
 from veriphix.client import Client, ClientMeasureMethod
-from veriphix.verifying import ComputationRun
+from veriphix.verifying import ClassicalComputationResult, ComputationRun
 
 
 class TestClient:
@@ -247,6 +247,40 @@ class TestClient:
         outcomes = comp_run.delegate(backend=backend, rng=fx_rng)
         assert outcomes is not None
         # TODO: assert something ? generate BQP computation for that
+
+    def test_client_does_not_mutate_pattern(self, fx_rng: Generator) -> None:
+        # Building a Client must leave the caller's pattern untouched. With a
+        # classical output the Client adds the M commands that measure the output
+        # qubits; done in place, that consumes the caller's output nodes (an output
+        # node is by definition one that is never measured) and silently invalidates
+        # any reference simulation taken afterwards.
+        circuit = rand_circuit(2, 2, fx_rng)
+        pattern = circuit.transpile().pattern
+        n_commands = len(list(pattern))
+        output_nodes = list(pattern.output_nodes)
+        state_ref = pattern.simulate(rng=fx_rng)
+
+        Client(pattern=pattern, rng=fx_rng)
+
+        assert len(list(pattern)) == n_commands
+        assert list(pattern.output_nodes) == output_nodes
+        assert pattern.simulate(rng=fx_rng).isclose(state_ref)
+
+    def test_two_clients_from_same_pattern(self, fx_rng: Generator) -> None:
+        # Two Clients built from the same pattern object must agree: the first one
+        # must not have consumed the output nodes the second one needs.
+        circuit = rand_circuit(2, 2, fx_rng)
+        pattern = circuit.transpile().pattern
+
+        client1 = Client(pattern=pattern, rng=fx_rng)
+        client2 = Client(pattern=pattern, rng=fx_rng)
+
+        assert client2.output_nodes == client1.output_nodes
+        result1 = ComputationRun(client1).delegate(backend=StatevectorBackend(), rng=fx_rng)
+        result2 = ComputationRun(client2).delegate(backend=StatevectorBackend(), rng=fx_rng)
+        assert isinstance(result1, ClassicalComputationResult)
+        assert isinstance(result2, ClassicalComputationResult)
+        assert result1.outcomes.keys() == result2.outcomes.keys() == set(client1.output_nodes)
 
     def test_graph_clifford_structure(self, fx_rng: Generator) -> None:
         nqubits = 5

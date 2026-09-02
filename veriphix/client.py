@@ -69,6 +69,16 @@ def get_byproduct_db(pattern: Pattern) -> dict[int, ByProduct]:
     return byproduct_db
 
 
+def clone_pattern(pattern: Pattern) -> Pattern:
+    """Return an independent copy of `pattern`.
+
+    The Client must not modify the pattern it is handed: `_add_measurement_commands`
+    adds `M` commands in place, which would consume the caller's output nodes.
+    See test_client_does_not_mutate_pattern.
+    """
+    return Pattern(pattern.input_nodes, list(pattern), pattern.output_nodes)
+
+
 def remove_flow(pattern: Pattern) -> Pattern:
     clean_pattern = Pattern(pattern.input_nodes)
     for cmd in pattern:
@@ -133,7 +143,8 @@ class Client:
     ) -> None:
         # See test_reject_yz_measurement.
         _check_all_measurements_in_xy(pattern)
-        self.initial_pattern: Pattern = pattern
+        # The Client owns the pattern it works on: see test_client_does_not_mutate_pattern.
+        self.initial_pattern: Pattern = clone_pattern(pattern)
         self.classical_output = classical_output
         self.output_predicate = output_predicate
 
