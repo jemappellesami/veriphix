@@ -78,14 +78,6 @@ class ComputationRun(Run):
             return ClassicalComputationResult(outcomes=results)
 
 
-def merge_pauli_strings(stabilizer_1: PauliString, stabilizer_2: PauliString) -> PauliString:
-    result = stabilizer_2.sign * stabilizer_1
-    # We can iterate through the support of stab2 as they are supposed to have equal support
-    for node in stabilizer_2.pauli_indices("XYZ"):
-        result[node] = stabilizer_2[node]
-    return result
-
-
 def merge(strings: list[PauliString]) -> PauliString:
     n = len(strings)
     l = len(strings[0])
@@ -236,10 +228,3 @@ class ResultAnalysis(Generic[_StateT]):
     # number of computation rounds for which the Client's predicate evaluated to True
     computation_count: int = 0
     quantum_output_states: list[_StateT] = field(default_factory=list)
-
-
-@dataclass
-class TrappifiedRun(Generic[_StateT]):
-    input_state: list[_StateT]
-    tested_qubits: list[int]
-    stabilizer: Pauli
