@@ -111,6 +111,8 @@ def generate_eigenstate(stabilizer: PauliString) -> list[PlanarState]:
 
 class TestRun(Run):
     meas_basis: Literal["_", "I", "X", "Y", "Z"]
+    # Whether each trap's own conjugated stabilizer carries a -1 sign.
+    trap_signs: dict[Trap, bool]
 
     __test__ = False  # this is not a pytest test-suite
 
@@ -125,13 +127,19 @@ class TestRun(Run):
 
     def build_common_stabilizer(self) -> PauliString:
         # Build the PauliStrings representing the individual measurement of each trap qubit
-        measurement_strings = [
-            PauliString([self.meas_basis if i in trap else "I" for i in range(self.nqubits)]) for trap in self.traps
-        ]
-        # Conjugate each measurement
-        conjugated_measurements = [self.clifford_structure.inverse()(meas) for meas in measurement_strings]
-        common_stabilizer = merge(conjugated_measurements)
-        return common_stabilizer
+        # and conjugate each of them.
+        conjugated_measurements = {
+            trap: self.clifford_structure.inverse()(
+                PauliString([self.meas_basis if i in trap else "I" for i in range(self.nqubits)])
+            )
+            for trap in self.traps
+        }
+        # Record each trap's own sign before merging: `merge` collapses the signs of
+        # all the traps into the single sign of the common stabilizer, which is their
+        # product and therefore says nothing about any individual trap.
+        # See test_traps_keep_their_own_stabilizer_sign.
+        self.trap_signs = {trap: conjugated.sign == -1 for trap, conjugated in conjugated_measurements.items()}
+        return merge(list(conjugated_measurements.values()))
 
     @override
     def delegate(
@@ -157,7 +165,9 @@ class TestRun(Run):
         trap_outcomes = dict()
         for trap in self.traps:
             outcomes = [self.client.results[component] for component in trap]
-            trap_outcome = sum(outcomes) % 2 ^ (self.stabilizer.sign == -1)
+            # The trap is prepared in the +1 eigenstate of the *unsigned* stabilizer, so
+            # its own sign is the parity an honest server is expected to return.
+            trap_outcome = sum(outcomes) % 2 ^ self.trap_signs[trap]
             trap_outcomes[frozenset(trap)] = trap_outcome
         return TestResult(trap_outcomes)
 
