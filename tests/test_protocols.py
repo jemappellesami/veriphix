@@ -56,9 +56,6 @@ class TestProtocols:
             table = json.load(f)
             circuits = list(table.keys())
         pattern = load_pattern_from_circuit(circuit_label=circuits[0])
-        # colors = veriphix.sampling_circuits.brickwork_state_transpiler.get_bipartite_coloring(pattern=pattern)
-
-        # fk_protocol = FK12(manual_colouring=colors) if manual else FK12()
         fk_protocol = FK12()
         client = Client(pattern=pattern, protocol=fk_protocol, rng=fx_rng)
         assert client.test_runs != []
