@@ -139,7 +139,7 @@ class RandomTraps(VerificationProtocol):
         n = len(client.graph.nodes)
         for _ in range(n):
             # Choose a random subset of nodes to create a trap (random size, random nodes)
-            trap_size = rng.integers(n)
+            trap_size = rng.integers(1, n + 1)
             random_nodes = [client.nodes[i] for i in rng.choice(len(client.nodes), size=trap_size, replace=False)]
             # Create a single-trap test round from it. The trap is multi-qubit.
             random_multi_qubit_trap = frozenset(random_nodes)

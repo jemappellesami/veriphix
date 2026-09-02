@@ -118,6 +118,25 @@ class TestProtocols:
         assert decision
         assert result_analysis.nr_failed_test_rounds == 0
 
+    def test_random_traps_are_non_empty_and_can_cover_all_nodes(self, fx_rng: np.random.Generator) -> None:
+        # The trap size was drawn from [0, n-1], so a run could trap nothing -- a test
+        # round that verifies no qubit and therefore always passes -- and could never
+        # trap all n nodes at once.
+        circuit = rand_circuit(2, 1, fx_rng)
+        pattern = circuit.transpile().pattern
+        client = Client(pattern=pattern, protocol=RandomTraps(), rng=fx_rng)
+        n = len(client.graph.nodes)
+
+        sizes = {
+            len(trap)
+            for seed in range(20)
+            for test_run in RandomTraps().create_test_runs(client=client, rng=np.random.default_rng(seed))
+            for trap in test_run.traps
+        }
+
+        assert min(sizes) >= 1, "a trap must never be empty"
+        assert max(sizes) == n, f"traps must be able to cover all {n} nodes"
+
     def test_dummyless(self, fx_rng: np.random.Generator) -> None:
         nqubits = 2
         depth = 1
