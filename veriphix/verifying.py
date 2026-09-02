@@ -81,7 +81,9 @@ class ComputationRun(Run):
 def merge(strings: list[PauliString]) -> PauliString:
     n = len(strings)
     l = len(strings[0])
-    common_string = strings[0]
+    # Accumulate into a copy: the caller keeps its own strings, and `merge` used to
+    # rewrite `strings[0]` in place. See test_merge_does_not_mutate_its_arguments.
+    common_string = strings[0].copy()
     for i in range(1, n):
         common_string.sign *= strings[i].sign
         for j in range(l):

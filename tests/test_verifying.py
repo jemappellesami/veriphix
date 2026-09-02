@@ -1,9 +1,10 @@
 import numpy as np
 from graphix.random_objects import rand_circuit
 from graphix.sim.statevec import StatevectorBackend
+from stim import PauliString
 
 from veriphix.client import Client
-from veriphix.verifying import TestRun
+from veriphix.verifying import TestRun, merge
 
 
 class TestVerifying:
@@ -30,3 +31,17 @@ class TestVerifying:
 
             for trap in traps:
                 assert outcomes[trap] == 0
+
+    def test_merge_does_not_mutate_its_arguments(self) -> None:
+        # `merge` used to accumulate into `strings[0]` and hand it back, so merging
+        # rewrote one of the strings it was given. Callers that keep a reference to
+        # their own strings -- to read each trap's sign, say -- would silently see
+        # the merged value instead of their own.
+        strings = [PauliString("+X_"), PauliString("-_Z")]
+        originals = [str(string) for string in strings]
+
+        merged = merge(strings)
+
+        assert [str(string) for string in strings] == originals
+        assert merged is not strings[0]
+        assert str(merged) == "-XZ"
