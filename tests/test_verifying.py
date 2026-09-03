@@ -1,6 +1,5 @@
 import networkx as nx
 import numpy as np
-from graphix import Measurement, OpenGraph
 from graphix.random_objects import rand_circuit
 from graphix.sim.statevec import StatevectorBackend
 
@@ -34,36 +33,28 @@ class TestVerifying:
                 assert outcomes[trap] == 0
 
     def test_traps_keep_their_own_stabilizer_sign(self, fx_rng: np.random.Generator) -> None:
-        r"""Each trap must be checked against its own stabilizer sign.
+        """Each trap must be checked against its own stabilizer sign.
 
-        The resource graph has two disconnected components::
+        `build_common_stabilizer` merges every trap's conjugated measurement string
+        into a single common stabilizer, whose sign is the *product* of the individual
+        signs and so says nothing about any one trap. Checking a trap against that
+        product inverts the verdict of every trap whose own sign differs from it: an
+        honest server gets rejected, and a server cheating on that trap gets accepted.
 
-            2       3          4
-             \     /           |
-              \   /            |
-                0              1
-
-        Trap A = {0, 2, 3} conjugates to a sign -1 string, trap B = {1} to a sign
-        +1 one, and each verifies correctly on its own. Placed in the same test
-        run they are merged into a single stabilizer carrying the *product* of
-        the signs, so applying that one sign to every trap inverts trap B and
-        rejects an honest server.
-
-        The two components are disconnected, so trap B's measured parity cannot
-        depend on whether trap A is being tested alongside it: only the
-        bookkeeping differs between the runs below.
+        The graph here is an ordinary transpiled random circuit, and it is connected.
+        Trap {0, 1, 2} conjugates to a sign -1 string and trap {5} to a sign +1 one;
+        they share node 4, where both carry Z, which is what lets them merge. Each
+        verifies correctly on its own, so both together must as well.
         """
-        og = OpenGraph(
-            graph=nx.Graph([(0, 2), (0, 3), (1, 4)]),
-            input_nodes=[0, 1],
-            output_nodes=[2, 3, 4],
-            measurements={0: Measurement.XY(0), 1: Measurement.XY(0)},
-        )
-        client = Client(pattern=og.to_pattern(), rng=fx_rng)
-        trap_a = frozenset({0, 2, 3})
-        trap_b = frozenset({1})
+        circuit = rand_circuit(2, 1, fx_rng)
+        pattern = circuit.transpile().pattern
+        client = Client(pattern=pattern, rng=fx_rng)
+        trap_a = frozenset({0, 1, 2})
+        trap_b = frozenset({5})
 
-        # The premise of the test: the two traps really do carry opposite signs.
+        # Premises of the test: a connected graph, and two traps of opposite sign.
+        # The pattern depends on the seed of `fx_rng`; if that changes, pick another pair.
+        assert nx.is_connected(client.graph)
         assert TestRun(client=client, traps=frozenset({trap_a})).stabilizer.sign == -1
         assert TestRun(client=client, traps=frozenset({trap_b})).stabilizer.sign == 1
 
